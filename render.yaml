@@ -30,15 +30,23 @@ services:
         sync: false
       - key: FMP_API_KEY
         sync: false
-      # Optional -- LangSmith tracing works without these too (server.py
-      # only reads LANGSMITH_PROJECT as a plain default, see app/graph.py).
-      # Leave blank in the Render dashboard prompt if you don't want
-      # production traces going to the same LangSmith project as local
-      # dev runs.
+      # Optional -- LangSmith tracing works without these too.
       - key: LANGSMITH_TRACING
         sync: false
       - key: LANGSMITH_API_KEY
         sync: false
+      # Separate LangSmith project from local dev, on purpose. graph.py
+      # sets this via os.environ.setdefault("LANGSMITH_PROJECT",
+      # "portfolio-copilot") -- setdefault only applies its value if the
+      # env var isn't already set. Locally, nothing sets LANGSMITH_PROJECT
+      # (not in .env), so local runs fall back to "portfolio-copilot".
+      # Here, setting it explicitly (not a secret, just a label -- hence
+      # a plain `value`, not `sync: false`) makes production traces land
+      # in their own "portfolio-copilot-prod" project instead, so a
+      # deployed user's chat doesn't mix into the same trace history as
+      # local dev testing.
+      - key: LANGSMITH_PROJECT
+        value: portfolio-copilot-prod
 
   - type: web
     name: portfolio-copilot-frontend
