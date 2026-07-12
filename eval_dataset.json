@@ -1,0 +1,176 @@
+{
+  "_meta": {
+    "description": "Locked 13-question eval dataset for the Personal Portfolio Copilot capstone. See Personal Portfolio Copilot-prd.md Task 1 §4 for the source table and methodology note. Thesis concept retired -- questions previously comparing content against a user's free-text thesis now test either objective driver-identification (Q1) or the Fundamentals Health Score (Q2, Q7, Q10, Q11, Q13).",
+    "scoring_methods": {
+      "ragas_triad": "RAGAS Faithfulness, LLMContextRecall, FactualCorrectness against a written reference answer. Session 6 / harness shape per Session 10 run_eval.py.",
+      "tool_call_goal_topic": "Tool-call accuracy (right tool, right args), goal accuracy (final answer satisfies the request), topic adherence (stays grounded in the user's actual holdings and Fundamentals Health Score, not thesis). Normalized from a LangGraph trace, per Session 6.",
+      "deterministic_assertion": "Exact-match / tolerance-based assertion against a computed ground-truth value (e.g. gain/loss math) -- not an LLM judge.",
+      "hybrid": "Deterministic assertion for a numeric sub-component, plus tool_call_goal_topic for the reasoning/synthesis wrapped around it."
+    },
+    "tickers_available": ["AAPL", "ALAB", "MRVL", "NBIS"]
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question_template": "What did {company}'s management identify as the specific driver behind {metric}?",
+      "category": "rag",
+      "scoring_method": "ragas_triad",
+      "expected_behavior": "Retrieves the exact quoted driver management cited (not a generic mention), distinguishes backward-looking results from forward-looking guidance, cites the exact transcript section.",
+      "reuses": "test_q1.py's load_ticker_documents/build_retriever (generic utilities, unchanged) + a new driver-identification prompt defined in run_eval.py -- test_q1.py's original Verdict/Evidence/Explanation thesis-comparison prompt is retired along with the thesis concept and is no longer used by this question.",
+      "status": "built",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs", "metric": "this quarter's gross margin change", "reference": "Non-GAAP gross margin was 76.4%, up 70 basis points from the previous quarter, attributed to a lower mix of hardware sales within signal conditioning."},
+        {"ticker": "ALAB", "company": "Astera Labs", "metric": "next quarter's gross margin guidance", "reference": "Fiscal Q2 2026 non-GAAP gross margin guidance of approximately 73%, including a 200 basis point non-cash impact from a one-time customer agreement."}
+      ]
+    },
+    {
+      "id": 2,
+      "question_template": "What's the latest news on {company}, and does it affect my position?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Live search (Tavily) for recent news, cross-referenced against the ticker's current Fundamentals Health Score; flags relevance high/medium/low with source links, noting whether the news touches any Monitor/At-Risk signal.",
+      "reuses": "test_q2.py (search_tavily, topic=general, RELEVANCE_PROMPT) -- RELEVANCE_PROMPT needs updating to compare against Fundamentals Health Score status instead of a stored thesis string",
+      "status": "built",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs", "days": 7, "topic": "general"},
+        {"ticker": "NBIS", "company": "Nebius", "days": 7, "topic": "general"}
+      ]
+    },
+    {
+      "id": 3,
+      "question_template": "Has {company}'s tone or substance changed on {risk_or_opportunity} across its last 4 earnings calls?",
+      "category": "rag",
+      "scoring_method": "ragas_triad",
+      "expected_behavior": "Synthesizes across 4 chronologically-ordered transcripts, identifies whether language or emphasis on the named topic shifted (introduced, dropped, escalated, softened), cites which call each shift occurred in. Tests longitudinal narrative-drift detection -- catching gradual changes a user would otherwise miss by only skimming 1-2 headlines a week (Problem Statement, Section 3).",
+      "reuses": "test_q1.py's load/retriever logic + a new chronological-synthesis prompt -- NOT built. Still blocked on data, not just the prompt: only 1 quarter of transcript is currently ingested per ticker (e.g. ALAB has only transcript_Q1_2026.txt); needs 3 more historical quarters fetched before this is runnable at all.",
+      "status": "not_built",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs", "risk_or_opportunity": "TBD -- pick a real recurring topic once 4 quarters of transcripts are ingested"}
+      ]
+    },
+    {
+      "id": 4,
+      "question_template": "Is there any insider selling in my holdings this week?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Queries insider-transaction data, filters to the user's portfolio tickers only, returns relevant Form 4 activity.",
+      "reuses": "test_q5.py (fetch_insider_transactions, shares_transacted via 'change' field, CODE_LABELS)",
+      "status": "built",
+      "test_cases": [
+        {"tickers": ["ALAB", "AAPL", "MRVL", "NBIS"], "days": 7}
+      ]
+    },
+    {
+      "id": 5,
+      "question_template": "Has there been any recent {topic} mentioned in {company}'s filings?",
+      "category": "rag",
+      "scoring_method": "ragas_triad",
+      "expected_behavior": "Agent must recognize the question demands complete/exhaustive recall -- missing a real disclosure is a genuine failure, not a minor gap -- and route to keyword/exact-match search rather than lossy top-k vector retrieval (a previously-demonstrated failure mode: k=6 missed a real match). Returns a synthesized, cited answer that distinguishes routine boilerplate risk-factor language from an active, material signal, rather than just dumping raw matches.",
+      "reuses": "test_q7.py (build_pattern regex, find_hits with ±200 char context) + SUMMARY_PROMPT synthesis pass, so the response is structurally comparable to the reference instead of a raw snippet dump",
+      "status": "deferred",
+      "deferred_reason": "Confirmed via --verbose run: SUMMARY_PROMPT's boilerplate-detection judgment is unreliable -- on the customer-concentration case it labeled a clearly generic forward-looking-statements bullet as 'substantive rather than boilerplate,' scoring faithfulness 0.0 (a real, grounded failure, not noise). The capacity/demand case scored fine (faithfulness 0.81) -- retrieval itself is exhaustive by design and not the problem. Also recurring: a RAGAS judge call has timed out on every Q5 run so far (3/3), specifically -- never on Q1 -- likely tied to Q5's larger context size (up to 87 matched snippets in one case). Deferred pending a fix to the boilerplate-classification prompt; picking the agent build back up takes priority before the deadline.",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs", "question": "Has there been any recent capacity or demand problems mentioned in Astera Labs's filings?", "keywords": ["capacity", "demand"], "reference": "Yes, both terms appear, but the substance skews toward strength, not weakness: 15 'capacity' mentions (14 in the 10-K, mostly standard manufacturing-dependency risk factors; 1 in the transcript, an analyst Q&A on inventory/capacity) and 72 'demand' mentions (62 in the 10-K, largely boilerplate risk language; 5 in the 10-Q including the MD&A line attributing Q1 2026's $308.4M revenue to 'a sizable increase in demand'; 5 in the transcript citing strong customer demand). No disclosure describes an active capacity shortfall or demand shortfall as a current event."},
+        {"ticker": "ALAB", "company": "Astera Labs", "question": "Has Astera Labs disclosed any customer concentration risk recently?", "keywords": ["customer concentration"], "reference": "Yes, but only as generic risk-factor boilerplate -- the identical sentence appears once in the 10-K and once in the 10-Q ('our customer concentration, with a limited number of end customers driving our revenue'), with no specific customer, percentage, or magnitude named. Not a disclosure of a new or worsening concentration event."}
+      ]
+    },
+    {
+      "id": 6,
+      "question_template": "What did analysts say after today's {event}?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Live search synthesis with dated, sourced citations distinguishing analyst commentary from company statements.",
+      "reuses": "test_q8.py (3-bucket ANALYST_PROMPT, fetch_recommendation_trends as authoritative institutional data)",
+      "status": "built",
+      "test_cases": [
+        {"ticker": "MRVL", "company": "Marvell", "event": "guidance cut", "days": 3, "topic": "general"}
+      ]
+    },
+    {
+      "id": 7,
+      "question_template": "{company} just dropped {move_pct}% today, I'm nervous -- should I sell?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Does not validate the fear reflexively; checks the drop against the ticker's actual Fundamentals Health Score signals (revenue/margin/insider/leadership) and recent filings/news, and states plainly whether anything changed -- separates signal from noise instead of mirroring the user's emotional framing. Parametrized across ticker/move size, not hardcoded to one scenario.",
+      "reuses": "run_eval.py's Q1 driver-identification retrieval + test_q2.py (news search) -- needs Finnhub /quote for live move %, not yet integrated",
+      "status": "not_built",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs", "move_pct": 8},
+        {"ticker": "NBIS", "company": "Nebius", "move_pct": 12},
+        {"ticker": "MRVL", "company": "Marvell", "move_pct": 3}
+      ]
+    },
+    {
+      "id": 8,
+      "question_template": "Have analysts changed their rating on {company} recently?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Queries Finnhub recommendation-trends, compares the current period to prior period(s), states whether the buy/hold/sell distribution shifted and by how much, with period dates cited.",
+      "reuses": "test_q8.py's fetch_recommendation_trends -- needs a dedicated period-over-period comparison prompt, not yet written (test_q8.py currently just reports the 2 most recent periods, doesn't diff them)",
+      "status": "partially_built",
+      "test_cases": [
+        {"ticker": "MRVL", "company": "Marvell"}
+      ]
+    },
+    {
+      "id": 9,
+      "question_template": "Summarize everything notable about {company} this week -- filings, media, and analyst activity.",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Synthesizes across all three signal categories (filings/keyword checks, Tavily media search, Finnhub institutional consensus) into one digest, each item cited to source and date.",
+      "reuses": "orchestrates test_q7.py + test_q2.py + test_q8.py -- no combined harness written yet",
+      "status": "not_built",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs"}
+      ]
+    },
+    {
+      "id": 10,
+      "question_template": "Given my cost basis, if I sold {company} today, what would my gain be, and does anything suggest I should?",
+      "category": "deterministic_calc",
+      "scoring_method": "hybrid",
+      "expected_behavior": "Computes exact gain/loss from stored cost basis and live price (deterministic), then separately checks current Fundamentals Health Score status -- never conflates the calculation with the recommendation.",
+      "reuses": "needs Finnhub /quote (not yet integrated) for live price + cost_basis from holdings table (not yet built) + the Fundamentals Health Score check (Q13's logic)",
+      "status": "not_built",
+      "test_cases": [
+        {"ticker": "AAPL", "company": "Apple", "shares": 25, "cost_basis_per_share": 180.00}
+      ]
+    },
+    {
+      "id": 11,
+      "question_template": "When does {company} report next, and what should I watch for based on its current Fundamentals Health Score?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Surfaces the next earnings date and names the specific sub-signal(s) -- revenue growth, margin, insider activity, leadership stability -- that the upcoming report will test, especially any currently at Monitor or At Risk.",
+      "reuses": "needs Finnhub /calendar/earnings (not yet integrated, same GET pattern as fetch_recommendation_trends) + the Fundamentals Health Score's current sub-signal statuses (Q13's logic)",
+      "status": "not_built",
+      "test_cases": [
+        {"ticker": "NBIS", "company": "Nebius"}
+      ]
+    },
+    {
+      "id": 12,
+      "question_template": "What happened across my whole portfolio this week that I should know about?",
+      "category": "tool_calling",
+      "scoring_method": "tool_call_goal_topic",
+      "expected_behavior": "Synthesizes across all held tickers, only surfaces items that would clear the alert-relevance threshold, cites each with source and date -- a pull-based version of what a proactive digest would push.",
+      "reuses": "extends Q9's orchestration across all 4 tickers, adds the relevance-threshold filter -- not built",
+      "status": "not_built",
+      "test_cases": [
+        {"tickers": ["AAPL", "ALAB", "MRVL", "NBIS"]}
+      ]
+    },
+    {
+      "id": 13,
+      "question_template": "Has anything about {company}'s underlying business gotten worse since I bought it -- revenue, margins, insider activity, or leadership?",
+      "category": "hybrid",
+      "scoring_method": "hybrid",
+      "expected_behavior": "Runs the four-signal Fundamentals Health Score (Task 2 §4): reports each sub-signal's status and the overall worst-of rollup, with the specific numbers/events driving any non-intact rating.",
+      "reuses": "insider sub-signal partially built (test_q5.py, needs the 10b5-1 materiality filter added); revenue/margin sub-signals need SEC EDGAR XBRL company-facts API (not built); leadership sub-signal needs 8-K Item 5.02 detection (not built)",
+      "status": "not_built",
+      "test_cases": [
+        {"ticker": "ALAB", "company": "Astera Labs", "date_purchased": "2025-08-01"}
+      ]
+    }
+  ]
+}

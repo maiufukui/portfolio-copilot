@@ -1,0 +1,137 @@
+Astera Labs (ALAB) Q1 2026 Earnings Transcript
+Source: The Motley Fool — https://www.fool.com/earnings/call-transcripts/2026/05/05/astera-labs-alab-q1-2026-earnings-transcript/
+Call date: Tuesday, May 5, 2026 at 4:30 p.m. ET
+Published: May 5, 2026
+
+Call participants:
+- Chief Executive Officer and Co-Founder — Jitendra Mohan
+- President and Chief Operating Officer and Co-Founder — Sanjay Gajendra
+- Chief Financial Officer — Desmond Lynch
+
+TAKEAWAYS
+
+- Revenue -- $308.4 million, up 14% sequentially and 93% year over year, driven by growth across both signal conditioning and fabric switch product portfolios.
+- PCIe Gen 6 revenue -- Contributed more than one-third of total company revenue, reflecting broad adoption in both AI fabric and signal conditioning segments.
+- Scorpio product family -- Began shipping initial volumes of Scorpio X Series and expects Scorpio to become the largest product line by year-end, surpassing P Series in revenue contribution.
+- Non-GAAP gross margin -- 76.4%, up 70 basis points from the previous quarter due to a lower mix of hardware sales within signal conditioning.
+- Non-GAAP operating expenses -- $123.9 million, including R&D expenses of $96.2 million, sales and marketing expenses of $12 million, and G&A expenses of $15.7 million.
+- Non-GAAP operating margin -- 36.2%, reflecting continued profitability while investing for sustained revenue growth.
+- Non-GAAP EPS -- $0.61 per diluted share, with 181.2 million fully diluted shares outstanding.
+- Cash, cash equivalents, & marketable securities -- $1.18 billion at quarter end, flat from Q4 as $74.6 million operating cash flow was offset by acquisition payments.
+- Fiscal Q2 2026 revenue outlook (period ending June 30, 2026) -- Expected between $355 million and $365 million, a 15%-18% sequential increase driven by further adoption of Scorpio, Aries, and Torus products.
+- Fiscal Q2 non-GAAP gross margin guidance -- Approximately 73%, including a 200 basis point non-cash impact from a one-time customer agreement.
+- Fiscal Q2 non-GAAP operating expense guidance -- Projected at $128 million to $131 million.
+- AI platform design wins -- Initial volume shipments of Scorpio X 320-lane fabric switch are ramping, with expanded hyperscaler design activity and two additional major hyperscalers expected to begin receiving Scorpio P Series late 2026.
+- Optical product progress -- Qualification process progressing at a major AI platform provider for the optical fiber coupler, with volume shipments targeted for 2027; XScale Photonics acquisition fully integrated and contributing to design pipeline.
+- Leo memory controller momentum -- Scheduled for deployment with Microsoft Azure M-series virtual machines and secured a new custom KV cache-oriented application design win, with related shipments expected in 2027.
+- UALink roadmap -- UALink-based switch products planned for initial deployments in 2027, positioning the company for future rack-scale connectivity cycles.
+
+SUMMARY
+
+The quarterly results highlight a significant acceleration in top-line and margin expansion, with sequential and annual revenue growth indicating strong customer demand across key product areas. Product and market developments include production shipments of the Scorpio X Series, ongoing adoption of PCIe Gen 6, and the full integration of the XScale Photonics acquisition, all contributing to diversified growth opportunities. Management emphasized a rapidly broadening pipeline, including optical, memory, and custom solution wins, positioning the company for increased dollar content per accelerator and new hyperscaler engagements in the upcoming quarters.
+
+- Management stated, "Scorpio will become our largest product line by the end of the year," signaling a material shift in mix and future revenue drivers.
+- CEO Jitendra Mohan said, "We have now shipped millions of PCIe Gen 6 ports to date," demonstrating broad-based deployment and customer traction across the PCIe portfolio.
+- The outlook anticipates fiscal Q2 earnings per share in the range of $0.68 to $0.70 on an expected 184 million diluted shares, with a non-GAAP tax rate of approximately 12%.
+- Investments in design centers and expanded supply chain were cited to support both near-term ramps and supply assurance into 2027.
+- Volume shipments of new optical connectivity products and initial UALink-based switch deployments are expected to begin in 2027.
+- Enhanced Cosmos software integration is now enabling hardware-accelerated features and performance improvements directly in customer AI platforms.
+- Portfolio expansion was attributed to successful design-ins with major AI ecosystem leaders for both standard and custom-developed connectivity solutions.
+
+INDUSTRY GLOSSARY
+
+- PCIe: Peripheral Component Interconnect Express, a high-speed interface standard for connecting various hardware components within data centers and servers, critical for AI and high-performance computing infrastructure.
+- Scorpio X Series / P Series: Astera Labs' families of AI fabric switches, supporting high lane counts and advanced hardware-accelerated features for AI network scaling (X for scale-up, P for diverse system topologies).
+- NPO: Near-Package Optics, integrating optical interconnects close to semiconductor packages to enable high-bandwidth, low-latency connectivity within rack-scale computing.
+- CPO: Co-Packaged Optics, technology embedding optical modules within the same package as networking silicon to increase bandwidth and reduce energy consumption versus traditional pluggables.
+- KV cache: Key-Value Cache, a memory architecture used to accelerate AI inferencing by offloading and optimizing specific memory functions.
+- Aries: Astera Labs' signal conditioning product line, supporting generational PCIe improvements for scale-out and scale-up connectivity.
+- Torus: Astera Labs' line of Ethernet AEC (Active Electrical Cable) modules, extending connectivity reach for both AI and general compute platforms.
+- UALink: An industry consortium specification focusing on open, high-bandwidth AI fabric switching for large-scale compute systems, with Astera Labs participating in switch development.
+- Cosmos software: Astera Labs' proprietary software stack, enabling advanced diagnostics, telemetry, and performance tuning of its connectivity products within customer systems.
+
+FULL CONFERENCE CALL TRANSCRIPT
+
+Jitendra Mohan, Chief Executive Officer and Co-Founder; Sanjay Gajendra, President and Chief Operating Officer and Co-Founder; and Desmond Lynch, Chief Financial Officer. Before we get started, I would like to remind everyone that certain comments made in this call today may include forward-looking statements regarding, among other things, expected future financial results, strategies and plans, future operations, and the markets in which we operate.
+
+These forward-looking statements reflect management's current beliefs, expectations, and assumptions about future events which are inherently subject to risks and uncertainties that are discussed in detail in today's earnings release and in the periodic reports and filings we file from time to time with the SEC, including the risks set forth in our most recent Annual Report on Form 10-K. It is not possible for the company's management to predict all risks and uncertainties that could have an impact on these forward-looking statements or the extent to which any factor or combination of factors may cause actual results to differ materially from those contained in any forward-looking statement.
+
+In light of these risks, uncertainties, and assumptions, all results, events, or circumstances reflected in the forward-looking statements discussed during this call may not occur and actual results could differ materially from those anticipated or implied. All of our statements are made based on information available to management as of today and the company undertakes no obligation to update such statements after the date of this call except as required by law. Also during the call, we will refer to certain non-GAAP financial measures which we consider to be an important measure of the company's performance. For example, the overview of our Q1 financial results and Q2 financial guidance are on a non-GAAP basis.
+
+These non-GAAP financial measures are provided in addition to, and not as a substitute for, financial results prepared in accordance with U.S. GAAP. A discussion of why we use non-GAAP financial measures—whose difference is primarily stock compensation, acquisition-related costs, and related income tax effect—and reconciliations between our GAAP and non-GAAP financial measures and financial outlook are available in the earnings release we issued today, which can be accessed through the Investor Relations portion of our website. With that, I would like to turn the call over to Jitendra Mohan, CEO of Astera Labs, Inc. Common Stock.
+
+Jitendra Mohan: Thank you, Leslie. Good afternoon, everyone, and thanks for joining our first quarter conference call for fiscal year 2026. Today, I will update you on AI infrastructure market trends, our Q1 results, and recent announcements. I will then turn the call over to Sanjay to discuss the company's growth profile. I would also like to welcome Des, our CFO, joining this call for the first time. Des will cover our Q1 financials and Q2 guidance. Since our last earnings call, AI infrastructure spending has clearly accelerated. Hyperscalers, AI labs, and sovereign entities are signaling the industry buildout is still in its early stages, underpinned by strong monetization and ROI.
+
+We expect these strong secular trends to be a tailwind for our growth over the long term. We delivered strong results in Q1 with revenue and non-GAAP EPS above our outlook. Revenue for the quarter was $308 million, up 14% from the prior quarter and up 93% versus Q1 of last year. Revenue growth was broad-based, spanning across our signal conditioning and fabric switch product portfolios as we continue to diversify our business profile with new design wins across multiple customers and product categories. Our PCIe 6 business across both AI fabric and signal conditioning was strong in Q1, with revenue expanding to more than one-third of our total revenue.
+
+We have now shipped millions of PCIe Gen 6 ports to date, demonstrating the robustness and maturity of our PCIe portfolio. Torus smart cable modules for Ethernet AECs continue to perform well as new program designs shift into volume while others ramp to mature levels across GPU, XPU, and general-purpose systems. On the scale-out fabric front, our initial design wins with Scorpio X Series in smaller radix configurations shifted from pre-production shipments to initial volume ramp during the first quarter. Building on this momentum, today we announced the expansion of our Scorpio product line of AI fabric switches for both scale-up and scale-out use cases.
+
+Scorpio X Series now supports up to 320 lanes for high-radix scale-up networking and Scorpio P Series PCIe 6 portfolio now spans 32 to 320 lanes for diverse system topologies, making it the broadest in the industry. Our new flagship Scorpio X Series 320-lane has been purpose built to maximize AI economics by leveraging hardware-accelerated hypercast and in-network compute engines to boost collective operations by up to 2x. In-network compute offloads critical accelerator-to-accelerator communication and computation directly onto the switch, dramatically reducing the networking overhead during large-scale training and inference.
+
+These hardware capabilities are delivered through enhancements to our Cosmos software which can now integrate deeper into our customer software stacks, providing not only diagnostics and telemetry, but also directly improving AI platform performance. These advanced hardware and software capabilities are a result of our deep system-level understanding of AI architectures and close customer collaborations, creating a durable competitive moat. We are excited to report that we are now shipping initial volumes of our new 320-lane Scorpio X, with production volumes ramping in 2026. Scorpio X Series also has a widening interest in design activity with hyperscalers, edge AI inference providers, and enterprise infrastructure builders to address high-bandwidth AI clustering use cases.
+
+Scorpio P Series continues to grow through 2026, and we expect initial shipments to at least two additional major hyperscalers towards the end of 2026, with broader deployment in 2027. On the optical front, we made good progress during the quarter as we continue to work through the qualification process at a large AI platform provider with our ultra-high-precision optical fiber coupler product, which we expect to ship in volume starting in 2027. We are actively expanding our volume manufacturing capabilities to support the ramp of both scale-out and scale-up applications.
+
+Beyond the early commercial traction of our merchant connectors, our high-density fiber coupler technology will be a critical piece of our long-term optical roadmap for NPO and CPO applications. Finally, our Leo memory controller is on track for an early ramp of CXL-attached memory with Microsoft Azure M-series virtual machines, and during the quarter, we captured a new custom design win for a KV cache-oriented application, with shipments expected in 2027. As we look to 2026, robust demand reflects secular AI infrastructure spending, deep customer partnerships, and expansion towards higher-value solutions within our portfolio. This trend is quickly increasing our silicon dollar content opportunity beyond $1,000 per XPU and positions us to outperform our end-market growth rates.
+
+As a result, we expect strong revenue growth to continue through 2026 and into 2027, driven by the proliferation of AI fabrics and the industry's transition to PCIe 6, 800-gig, and 1.6T Ethernet connectivity. Based on the momentum we are seeing in 2026, we are strategically investing to drive strong continued growth. Our acquisition of XScale Photonics has created immediate design opportunities and our design center is fully integrated and working with customers on new programs. We have expanded our product portfolio, increased dollar content per accelerator, and diversified our customer base with additional design-ins.
+
+We are making progress within large market opportunities including optical engines and interconnects, UALink fabrics, and custom solutions for NVLink and AI inferencing. With that, let me turn the call over to our President and COO, Sanjay Gajendra, to outline our vision for growth over the next several years.
+
+Sanjay Gajendra: Thanks, Jitendra, and good afternoon, everyone. Today, I will provide an update on our recent execution followed by an overview of the meaningful market opportunities that will fuel our growth over the next several years. Our mission is to deliver a purpose-built intelligent connectivity platform with a portfolio of standard, custom, and platform-level solutions across copper and optical interconnects for rack-scale AI infrastructure deployments. As AI deployments advance to production at scale and operational efficiency, infrastructure teams face a new set of constraints—multitrillion-parameter models, agentic workflows, multistep reasoning distributed across heterogeneous compute infrastructure, to name a few.
+
+Starting with our standard products, we continue to see strong momentum across both AI fabric and signal conditioning portfolios. We strengthened our mission-critical position with the introduction of our flagship Scorpio X Series 320-lane scale-up fabric switch and the overall expansion of our Scorpio switch portfolio. The Scorpio X Series 320-lane high-radix AI fabric switch replaces multiple legacy switches to enable large scale-up cluster sizes in a single hop and reduces overall latency. Several new features such as in-network compute reduce time-to-first-token and tokens-per-watt performance. The newly expanded Scorpio P Series PCIe switch portfolio now spans from 32 lanes to 320 lanes to enable diverse accelerator optionality and system topologies.
+
+On the signal conditioning portfolio, our Aries products will expand to support PCIe 7 and our Torus portfolio into 1.6T Ethernet, positioning us at the forefront of the next connectivity upgrade cycle. Turning to our optical business, our signal connectivity business is driven by the rapid shift of AI systems towards rack-scale architectures and higher compute capabilities where scaling performance increasingly depends on high-bandwidth, high-radix, low-latency interconnects.
+
+We are focused on three areas pertaining to scale-up optics: 1) high-density detachable, reflowable fiber-attach solutions using core technology from our XScale acquisition, expecting to ship these connectors in volume starting in 2027; 2) chipsets in support of NPO that will enable multi-rack AI clusters starting in 2027; and 3) eventually fully optically enabled Scorpio X fabric switches with CPO supporting larger domains, higher egress densities, and bandwidth. Our custom solutions business continues to make meaningful progress. First, we are engaging with multiple customers to enable NVIDIA NVLink Fusion's scale-up architecture for hybrid racks. Second, we are seeing new custom solution opportunities within the memory space for KV cache applications, including a new design leveraging a customized version of our Leo CXL controller.
+
+Desmond Lynch: Thank you, Sanjay, and good afternoon, everyone. Revenue in Q1 2026 was $308.4 million, up 14% versus the previous quarter and up 93% year over year. We saw revenue growth across our signal conditioning and switch fabric portfolios, supporting both scale-up and scale-out connectivity for AI fabric and reach-extension applications. Our Scorpio product family performed well in Q1, driven by strong demand for PCIe Gen 6 switching applications and continued expansion of designs across various platforms. During the quarter, Scorpio X Series products began shipping in initial production volumes. Aries revenue grew on strong early adoption of our PCIe 6 solutions for both scale-out and scale-up signal conditioning. In total, PCIe Gen 6 revenue across AI fabric and signal conditioning contributed more than one-third of total company revenue in the quarter.
+
+Torus also delivered solid results driven by broad adoption of AEC to extend reach in both AI and general-purpose compute platforms. Non-GAAP gross margin for the first quarter was 76.4%, up 70 basis points sequentially, primarily driven by a lower mix of hardware sales across our signal conditioning portfolio. Non-GAAP operating expenses for the first quarter were $123.9 million, reflecting continued R&D investment to support our expanding product roadmap, including a full quarter of our XScale acquisition and a partial quarter of our newly formed Israel Design Center. Within Q1 non-GAAP operating expenses, R&D expenses were $96.2 million, sales and marketing expenses were $12 million, and general and administrative expenses were $15.7 million.
+
+Non-GAAP operating margin for the first quarter was 36.2%. For the first quarter, interest income was $11.6 million, our non-GAAP tax rate was 11%, and non-GAAP fully diluted shares outstanding were 181.2 million shares. Non-GAAP diluted earnings per share for the quarter were $0.61. We ended the quarter with cash, cash equivalents, and marketable securities totaling $1.18 billion, flat versus Q4, as cash from operations of $74.6 million was offset by cash paid for acquisitions.
+
+Now turning to our outlook for the second quarter, we expect revenue to be between $355 million and $365 million, up 15% to 18% sequentially, driven by continued strength across our AI fabric and signal conditioning portfolios. We expect second-quarter non-GAAP gross margin to be approximately 73%. This outlook includes an estimated 200 basis point non-cash impact related to a recently executed one-time agreement with one of our customers. We expect second-quarter non-GAAP operating expenses to be between $128 million and $131 million. Interest income is expected to be approximately $11 million and we expect a non-GAAP tax rate to be approximately 12%. We expect our Q2 share count to be 184 million diluted shares outstanding. Overall, we are expecting non-GAAP fully diluted earnings per share to be between $0.68 and $0.70.
+
+Q&A SECTION
+
+Harlan Sur (JPMorgan): Asked how the transition to more inferencing-based and agentic workloads has created new silicon opportunities and expanded SAM.
+Jitendra Mohan: Noted the company has been focused on AI applications from the start — helped training workloads and is now helping inferencing workloads equally well. Highlighted the KV cache offload custom design win and the new Scorpio X 320-lane family's in-network compute and hypercast features as key to reducing networking overhead for training and inference, enabled via Cosmos software.
+
+Blayne Curtis (Jefferies): Asked about the size of the Scorpio ramp and milestones for the 320-lane product reaching production.
+Desmond Lynch: Scorpio P continues to ramp on scale-out opportunities; Scorpio X is a greenfield scale-up opportunity, with high-radix configurations layering in during the second half of the year. Expects Scorpio to become the largest product line by year-end, with X Series revenue exceeding P Series as the year progresses.
+Jitendra Mohan: Confirmed shipping has begun on the new Scorpio X family, to be demonstrated live at Computex.
+
+Joe Moore (Morgan Stanley): Asked about the timeframe for optical scale-up becoming relevant and what's needed to transition from copper to optical.
+Sanjay Gajendra: Said the company has spent the last couple of years building foundational mixed-signal, electronic IC, and PIC technology, plus the XScale acquisition (pluggable connector and PIC technology). NPO-based opportunities expected to ramp first, starting 2027; pluggable connector/AEC technologies ramping in 2027; main CPO deployments expected in the 2028 timeframe.
+
+Ross Seymore (Deutsche Bank): Asked about demand trajectory and growth potential for the Leo product line given CPU/memory demand.
+Jitendra Mohan: Seeing increased CXL traction for both general-purpose compute and inferencing. On track for Microsoft Azure M-series deployment (private beta now, GA expected end of year). Picked up a second custom CXL design win this quarter, expected to ship revenue in 2027.
+
+Tore Svanberg (Stifel): Asked how to think about the mix between Aries and Scorpio into 2027.
+Desmond Lynch: Expects continued strong growth in Aries alongside Scorpio; Scorpio will remain the largest and fastest-growing business within the company.
+
+Ananda Baruah (Loop Capital): Asked whether lane counts on Scorpio X and P switches will continue to increase as clusters get bigger.
+Jitendra Mohan: Said the company works closely with customers to target the right lane counts/rates for deployment profiles, and will increasingly enable optical connectivity (starting with NPO, then CPO) alongside continued copper support.
+
+Natalia Winkler (UBS): Asked for color on the NVLink Fusion opportunity and competitive positioning.
+Sanjay Gajendra: Business divides into standard products, custom solutions, and module/solution business. NVLink Fusion-type custom devices are a growing opportunity with deep engagement alongside NVIDIA and a hyperscaler; expected to start contributing revenue in 2027.
+
+Sebastien Cyrus Naji (William Blair): Asked how to think about ASPs for higher-radix Scorpio solutions.
+Sanjay Gajendra: Bigger switches carry higher ASPs, but ASP is also driven by feature set (in-network compute, hypercast), not lane count alone. Expects content to exceed $1,000 per accelerator and to keep growing.
+
+Quinn Bolton (Needham): Asked for sizing detail on the KV cache offload custom design opportunity.
+Sanjay Gajendra: Said it's early to size exactly since platforms/architectures are still being finalized, but described it as a significant opportunity; ASPs will remain meaningful relative to the cost of attached memory.
+
+Sam Feldman (for Karl Ackerman, BNP Paribas): Asked whether customers view XPO as viable versus pluggable optics, and whether the company will participate in the XPO MSA.
+Jitendra Mohan: Will participate in XPO where customers want it, but focus so far has been on NPO and CPO; will support CPO-focused customers directly, expected to ship in 2027.
+
+Suji Desilva (ROTH Capital): Asked whether standard products are becoming less applicable as platforms diverge and customization increases.
+Sanjay Gajendra: Standard products (Aries, Torus, Scorpio) already offer significant customization via the software-defined Cosmos interface. Custom solutions are a growing, separate business model (including NREs) and will be pursued systematically given margin/risk considerations, while standard products remain a core part of the portfolio.
+
+Bashan (for Mehdi Hosseini, Susquehanna): Asked for an update on UALink adoption timeline and expected dollar content versus PCIe switching.
+Jitendra Mohan: Amazon and AMD have both signaled ASIC/GPU launches in 2027, which the company will intercept with its UALink switch. Expects substantially higher value/ASPs for these devices than PCIe switches, with media attach shifting from majority copper toward a blend of copper and NPO, and eventually CPO.
+
+Tore Svanberg (Stifel, follow-up): Asked about inventory days (~75 days) and capacity.
+Desmond Lynch: Said the company has supply in place through year-end and is comfortable with inventory holdings; some industry-wide supply pockets remain challenging, but backend supply chain diversification has ensured sufficient supply to meet revenue commitments.

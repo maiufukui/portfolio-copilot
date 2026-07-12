@@ -1,0 +1,64 @@
+# Render Blueprint -- deploys both services from one file via
+# Render dashboard > New > Blueprint (select this repo, Render finds
+# this automatically).
+#
+# Two services, matching how this project is actually structured
+# (server.py wraps app/graph.py; frontend/ is a separate Next.js app
+# that calls it over HTTP -- see server.py and frontend/lib/api.ts):
+#   1. portfolio-copilot-backend  -- FastAPI, Python
+#   2. portfolio-copilot-frontend -- Next.js, Node
+#
+# Secrets (sync: false) are NOT in this file and never will be -- Render
+# prompts for them once, in the dashboard, when you deploy this
+# Blueprint. Get the values from this repo's local .env (never commit
+# that file -- it's already in .gitignore).
+
+services:
+  - type: web
+    name: portfolio-copilot-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-server.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: FMP_API_KEY
+        sync: false
+      # Optional -- LangSmith tracing works without these too (server.py
+      # only reads LANGSMITH_PROJECT as a plain default, see app/graph.py).
+      # Leave blank in the Render dashboard prompt if you don't want
+      # production traces going to the same LangSmith project as local
+      # dev runs.
+      - key: LANGSMITH_TRACING
+        sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+
+  - type: web
+    name: portfolio-copilot-frontend
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npm start -- -p $PORT
+    envVars:
+      # Deliberately sync: false rather than fromService: property: host.
+      # Render subdomains are globally unique across all Render accounts,
+      # so "portfolio-copilot-backend" may not be the backend's actual
+      # final hostname if that name is already taken by someone else --
+      # sync: false means you paste in whatever URL the backend service
+      # actually gets assigned (visible in the Render dashboard as soon
+      # as that service is created), instead of risking a malformed or
+      # wrong URL getting baked into the frontend's build silently.
+      #
+      # NEXT_PUBLIC_* vars are inlined into the client bundle at BUILD
+      # time in Next.js -- if the backend isn't deployed yet (or you
+      # change its URL later), rebuild/redeploy the frontend after
+      # updating this value, a restart alone won't pick up the change.
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
