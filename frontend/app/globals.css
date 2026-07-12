@@ -52,10 +52,16 @@
   /* Light gray page background, white cards -- cards visually "float"
      on the page rather than blending into it (matches the ticker-card
      grid, health-score panel, and news panel all being separate cards).
-     0.965 (first attempt) was too close to white (--card is 1 0 0) to
-     read as gray at all in practice -- 0.93 is the same idea but
-     actually visible against white cards. */
-  --background: oklch(0.93 0 0);
+     0.965 (first attempt, no chroma) was too close to white (--card is
+     1 0 0) to read as gray at all. 0.93 (second attempt) fixed the
+     visibility problem but reads as a flat, heavy construction-paper
+     gray -- not the refined/premium tone being asked for now.
+     0.95 lightness keeps enough delta from white cards to stay visible,
+     with a small cool-blue chroma (0.004 at 240 hue) instead of a
+     neutral gray -- a cool undertone is the standard visual cue for
+     trust/stability in fintech UI (Stripe, Mercury, most banking
+     dashboards lean cool-gray rather than warm-gray for this reason). */
+  --background: oklch(0.95 0.004 240);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
