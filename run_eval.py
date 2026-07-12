@@ -45,7 +45,7 @@ from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import FactualCorrectness, Faithfulness, LLMContextRecall
 
 from test_q1 import build_retriever, load_ticker_documents
-from test_q7 import find_hits, SUMMARY_PROMPT
+from test_q7 import count_raw_hits_by_keyword, dedupe_hits, find_hits, format_grouped_hits, format_single_hit, SUMMARY_PROMPT
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -130,25 +130,61 @@ def run_rag_q5(case: dict) -> dict:
     0.39 "demand" score from the earlier version). Fixed by running the
     same LLM synthesis pass test_q7.py already exposes via --summarize
     (SUMMARY_PROMPT) before scoring, so response and reference are
-    comparable in structure, not just in content."""
+    comparable in structure, not just in content.
+
+    Raw hits are deduped (dedupe_hits) before both the synthesis call and
+    the RAGAS retrieved_contexts -- fixes the two problems noted in
+    eval_dataset.json Q5's deferred_reason: the customer-concentration
+    case's 0.0 faithfulness (SUMMARY_PROMPT had no signal that its two
+    hits were the same sentence repeated verbatim across the 10-K/10-Q)
+    and the recurring judge timeout on 3/3 Q5 runs (tied to up to 87 raw
+    snippets in one synthesis call -- deduping plus the dedupe cap in
+    test_q7.py bounds that).
+
+    A verified re-run of this fix (faithfulness 0.0 -> 0.667 on the
+    customer-concentration case, no timeout) surfaced a second, distinct
+    issue: factual_correctness on the capacity/demand case dropped to
+    0.13, because the written reference states RAW mention counts ("72
+    'demand' mentions") but the deduped response was implicitly counting
+    the deduped set instead. count_raw_hits_by_keyword feeds the true raw
+    count into the prompt so the response states the same total the
+    reference does, while the deduped excerpts underneath are still used
+    for the (correct) boilerplate/substantive judgment -- both numbers
+    are now real, not one overwriting the other.
+
+    retrieved_contexts uses format_single_hit (same text the LLM itself
+    reads via format_grouped_hits/hits_text), not bare snippet text --
+    an earlier version used [g["snippet"] for g in grouped], which
+    stripped out the location metadata (which filing(s) an excerpt
+    appears in). The response correctly states that metadata (it's true,
+    the LLM was given it), but RAGAS's faithfulness judge had no way to
+    verify a claim against context that never contained it, so a true
+    statement scored as unfaithful. Now the judge sees exactly what the
+    LLM saw."""
     documents = load_ticker_documents(case["ticker"])
     keywords = case.get("keywords") or [case.get("keyword")]
     hits = find_hits(documents, keywords)
-    contexts = [h["snippet"] for h in hits] or ["No verbatim matches found."]
     query = case.get("question") or f"Has there been any recent {' or '.join(keywords)} mentioned in {case['ticker']}'s filings?"
 
     if not hits:
-        return {"retrieved_contexts": contexts, "response": "No matches found for any of the searched terms.", "user_input": query}
+        return {
+            "retrieved_contexts": ["No verbatim matches found."],
+            "response": "No matches found for any of the searched terms.",
+            "user_input": query,
+        }
 
-    hits_text = "\n\n".join(
-        f"Source: {h['source']}"
-        + (f" (page {h['page']})" if h.get("page") is not None else "")
-        + f"\nMatched: {h['keyword']}\nExcerpt: ...{h['snippet']}..."
-        for h in hits
-    )
+    grouped = dedupe_hits(hits)
+    contexts = [format_single_hit(g) for g in grouped]
+    hits_text = format_grouped_hits(grouped)
+    raw_counts = count_raw_hits_by_keyword(hits, keywords)
     chain = SUMMARY_PROMPT | answer_llm | StrOutputParser()
     response = chain.invoke(
-        {"ticker": case["ticker"], "keywords": ", ".join(keywords), "hits": hits_text}
+        {
+            "ticker": case["ticker"],
+            "keywords": ", ".join(keywords),
+            "hits": hits_text,
+            "raw_counts": raw_counts,
+        }
     )
     return {"retrieved_contexts": contexts, "response": response, "user_input": query}
 
@@ -287,9 +323,19 @@ def main():
 
     for q in questions:
         print(f"\nQ{q['id']}: {q['question_template']}")
-        if q["status"] not in ("built", "partially_built"):
+        # --question N is an explicit, targeted request -- run it regardless
+        # of status. The default "run everything runnable" pass still skips
+        # deferred/not_built questions (no --question given), since those
+        # aren't meant to run unattended. This is what lets a "deferred
+        # pending a fix" question (e.g. Q5, see eval_dataset.json) actually
+        # be re-tested via `--question 5 --verbose` once the fix is in,
+        # without having to hand-edit the dataset's status field first just
+        # to test whether the fix worked.
+        if q["status"] not in ("built", "partially_built") and not args.question:
             print(f"  SKIPPED -- status='{q['status']}'. {q['reuses']}")
             continue
+        elif q["status"] not in ("built", "partially_built"):
+            print(f"  status='{q['status']}' but running anyway (--question explicitly given).")
 
         if q["category"] == "rag":
             score_rag_question(q, verbose=args.verbose)
