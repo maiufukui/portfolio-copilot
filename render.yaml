@@ -14,6 +14,13 @@
 # that file -- it's already in .gitignore).
 
 services:
+  # Python version is pinned via .python-version (repo root, "3.12") --
+  # NOT here. Render's default runtime is newer than what tiktoken==0.9.0
+  # has a prebuilt wheel for; without pinning, pip tries to compile it
+  # from source on Render's build image and fails (confirmed via a real
+  # failed deploy: "Failed to build installable wheels ... tiktoken").
+  # 3.12 matches this repo's local .venv exactly, where it's already
+  # proven to work.
   - type: web
     name: portfolio-copilot-backend
     runtime: python
