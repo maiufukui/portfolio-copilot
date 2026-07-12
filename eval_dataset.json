@@ -105,8 +105,8 @@
       "category": "tool_calling",
       "scoring_method": "tool_call_goal_topic",
       "expected_behavior": "Queries Finnhub recommendation-trends, compares the current period to prior period(s), states whether the buy/hold/sell distribution shifted and by how much, with period dates cited.",
-      "reuses": "test_q8.py's fetch_recommendation_trends -- needs a dedicated period-over-period comparison prompt, not yet written (test_q8.py currently just reports the 2 most recent periods, doesn't diff them)",
-      "status": "partially_built",
+      "reuses": "test_q8.py --mode rating_change: fetch_recommendation_trends + compute_trend_deltas (deterministic Python diff between the two most recent periods) + RATING_CHANGE_PROMPT (LLM narrates the precomputed deltas, does not recompute them). Verified via two real runs against MRVL: correctly reported a 1-analyst buy-rating increase (29->30) with all other categories unchanged, both period dates cited.",
+      "status": "built",
       "test_cases": [
         {"ticker": "MRVL", "company": "Marvell"}
       ]

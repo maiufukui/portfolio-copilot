@@ -11,9 +11,11 @@ market/fundamentals data) for 4 tracked tickers: **ALAB, AAPL, MRVL, NBIS**.
 ## Where things live
 
 - **This repo** (`Portfolio Tracker Assistant/`): all code.
-- **PRD**: `/Users/maiufukui/v1-0/Personal Portfolio Copilot-prd.md` — Task 1–4 (problem,
-  solution, data, prototype) + Appendix + Open Items. Open Items is the living log of known
-  gaps/bugs — read it directly, don't trust a stale summary.
+- **PRD**: `Personal Portfolio Copilot-prd.md` (this repo's root) — Task 1–4 (problem, solution,
+  data, prototype), Task 5–7 (evals, improvements, next steps), Appendix, and Open Items. Moved
+  here from `/Users/maiufukui/v1-0/` so the written deliverable lives inside the graded repo, per
+  the rubric's "Public GitHub Repo" requirement. Open Items is the living log of known gaps/bugs
+  — read it directly, don't trust a stale summary.
 - **Grading rubric**: `/Users/maiufukui/v1-0/rubric.md` — 100 pts across 8 sections. Note the
   "Improving Your Prototype" section has **three** separate line items (advanced retriever 6pt,
   before/after table 2pt, change to *some other* piece of the solution 6pt) — easy to miss the

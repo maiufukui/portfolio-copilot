@@ -62,6 +62,83 @@ def format_recommendation_trends(trends: list[dict]) -> str:
         )
     return "\n".join(lines)
 
+
+# --- Eval Q8: "Have analysts changed their rating on {company} recently?" ---
+# Distinct from the Q6 driver above: no event, no Tavily search -- just Finnhub
+# recommendation-trends, diffed period-over-period. The diff itself is computed
+# here in plain Python (deterministic, exact) rather than asked of the LLM --
+# same reasoning as Q10/Q13's deterministic-assertion pieces elsewhere in this
+# eval set: don't trust an LLM to do subtraction when Python already can, and
+# score-check it exactly instead of hoping a judge notices a wrong diff.
+RATING_CATEGORIES = ["strongBuy", "buy", "hold", "sell", "strongSell"]
+
+
+def compute_trend_deltas(trends: list[dict]) -> dict | None:
+    """Deterministic diff between the two most recent periods' recommendation
+    trends. Returns None if fewer than 2 periods of data exist -- there's
+    nothing to diff against, and the prompt needs to say that plainly rather
+    than fabricate a comparison."""
+    if len(trends) < 2:
+        return None
+    current, prior = trends[0], trends[1]
+    return {
+        "current_period": current.get("period"),
+        "prior_period": prior.get("period"),
+        "current_counts": {c: current.get(c, 0) for c in RATING_CATEGORIES},
+        "prior_counts": {c: prior.get(c, 0) for c in RATING_CATEGORIES},
+        "deltas": {c: current.get(c, 0) - prior.get(c, 0) for c in RATING_CATEGORIES},
+    }
+
+
+RATING_CHANGE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "human",
+            'The user asked: "Have analysts changed their rating on {company} '
+            'recently?"\n\n'
+            "Below is real institutional recommendation-trend data (Finnhub, "
+            "aggregated sell-side coverage counts) for the two most recent "
+            "periods, plus the exact deltas already computed between them in "
+            "Python -- these numbers are authoritative, do not recompute or "
+            "second-guess them.\n\n"
+            "Current period ({current_period}): {current_counts}\n"
+            "Prior period ({prior_period}): {prior_counts}\n"
+            "Computed deltas, current minus prior ({current_period} vs "
+            "{prior_period}): {deltas}\n\n"
+            "State plainly whether the buy/hold/sell distribution shifted and "
+            "by how much, citing both period dates explicitly. If every delta "
+            "is zero, say directly that the distribution hasn't changed rather "
+            "than describing a shift that didn't happen. Keep the answer to "
+            "3-4 sentences.",
+        )
+    ]
+)
+
+
+def run_rating_change(company: str, trends: list[dict]) -> str:
+    """Q8's actual check: no Tavily, no --event -- just the Finnhub trend
+    data, diffed deterministically and narrated by the LLM from the computed
+    numbers rather than the model's own arithmetic."""
+    deltas = compute_trend_deltas(trends)
+    if deltas is None:
+        return (
+            "Only one period of institutional recommendation-trend data is "
+            "available for this ticker -- there's nothing to compare it "
+            "against yet, so no period-over-period shift can be reported."
+        )
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+    chain = RATING_CHANGE_PROMPT | llm | StrOutputParser()
+    return chain.invoke(
+        {
+            "company": company,
+            "current_period": deltas["current_period"],
+            "current_counts": deltas["current_counts"],
+            "prior_period": deltas["prior_period"],
+            "prior_counts": deltas["prior_counts"],
+            "deltas": deltas["deltas"],
+        }
+    )
+
 ANALYST_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
@@ -102,17 +179,29 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ticker", required=True)
     parser.add_argument("--company", required=True)
-    parser.add_argument("--event", required=True, help='e.g. "guidance cut", "earnings miss"')
+    parser.add_argument(
+        "--mode",
+        default="reaction",
+        choices=["reaction", "rating_change"],
+        help=(
+            "reaction (default, eval Q6): Tavily + Finnhub, 'what did analysts "
+            "say after {event}'. rating_change (eval Q8): Finnhub only, "
+            "period-over-period rating shift, no --event needed."
+        ),
+    )
+    parser.add_argument(
+        "--event", required=False, help='e.g. "guidance cut", "earnings miss" -- required for --mode reaction'
+    )
     parser.add_argument(
         "--days", dest="time_range", default="week", choices=["day", "week", "month", "year"]
     )
     parser.add_argument("--topic", default="news", choices=["news", "general"])
     args = parser.parse_args()
 
-    tavily_key = os.environ.get("TAVILY_API_KEY")
+    if args.mode == "reaction" and not args.event:
+        raise SystemExit("--event is required for --mode reaction (default mode)")
+
     finnhub_key = os.environ.get("FINNHUB_API_KEY")
-    if not tavily_key:
-        raise SystemExit("TAVILY_API_KEY not set in .env")
     if not finnhub_key:
         raise SystemExit("FINNHUB_API_KEY not set in .env")
     if not os.environ.get("OPENAI_API_KEY"):
@@ -122,6 +211,18 @@ def main():
     trends = fetch_recommendation_trends(args.ticker, finnhub_key)
     trends_text = format_recommendation_trends(trends)
     print(f"\n{trends_text}\n")
+
+    if args.mode == "rating_change":
+        print("Comparing current period to prior period (deterministic diff, no Tavily)...")
+        output = run_rating_change(args.company, trends)
+        print("\n" + "=" * 60)
+        print(output)
+        print("=" * 60)
+        return
+
+    tavily_key = os.environ.get("TAVILY_API_KEY")
+    if not tavily_key:
+        raise SystemExit("TAVILY_API_KEY not set in .env")
 
     # Company name + event only -- dropping the ticker symbol and generic
     # "analyst reaction" wording, which diluted the match in testing (see
