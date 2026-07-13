@@ -91,8 +91,8 @@
       "category": "tool_calling",
       "scoring_method": "tool_call_goal_topic",
       "expected_behavior": "Does not validate the fear reflexively; checks the drop against the ticker's actual Fundamentals Health Score signals (revenue/margin/insider/leadership) and recent filings/news, and states plainly whether anything changed -- separates signal from noise instead of mirroring the user's emotional framing. Parametrized across ticker/move size, not hardcoded to one scenario.",
-      "reuses": "run_eval.py's Q1 driver-identification retrieval + test_q2.py (news search) -- needs Finnhub /quote for live move %, not yet integrated",
-      "status": "not_built",
+      "reuses": "test_q7_grounding.py: calls the real deployed agent (app.graph.ask) against all 3 locked test cases, checks it called a live data-checking tool, and has an independent LLM judge score topic_adherence/goal_accuracy/tool_call_accuracy. Verified: 3 of 3 cases PASS on all three criteria -- the agent grounds every response in a specific signal (health score status, insider activity, analyst ratings, or live price) rather than validating or dismissing the user's fear reflexively. NBIS case notably caught that the described 12% drop didn't match the actual live price (+1.6%) and said so.",
+      "status": "built",
       "test_cases": [
         {"ticker": "ALAB", "company": "Astera Labs", "move_pct": 8},
         {"ticker": "NBIS", "company": "Nebius", "move_pct": 12},
@@ -117,8 +117,8 @@
       "category": "tool_calling",
       "scoring_method": "tool_call_goal_topic",
       "expected_behavior": "Synthesizes across all three signal categories (filings/keyword checks, Tavily media search, Finnhub institutional consensus) into one digest, each item cited to source and date.",
-      "reuses": "orchestrates test_q7.py + test_q2.py + test_q8.py -- no combined harness written yet",
-      "status": "not_built",
+      "reuses": "test_q9.py: calls the real deployed agent with the eval's own question wording, checks tool-call coverage across all 3 named categories (filings/media/analyst), independent LLM judge scores source_coverage/citation_quality/tool_call_accuracy. Real run against ALAB first surfaced a defect: agent called search_live_news + get_market_data but never a filings tool, yet its summary asserted 'No new filings or 8-K disclosures were found this week' as a checked fact -- an ungrounded claim, not just a skipped tool. A prompt-only fix (STABLE_SYSTEM_PROMPT rule) improved Q7 as a side effect but did not fix Q9 (2 re-runs, same miss). Fixed with a deterministic code-level guard in app/graph.py's ask(): if the question names filings and the trace skipped a filings tool, call search_filings directly and force a correction turn instructing the model to add/correct only the filings section while preserving the rest verbatim. First correction-turn version regressed citation detail on market/news sections (new FAILs on citation_quality/tool_call_accuracy, different reason than the original bug); tightened the correction prompt to explicitly require preserving prior detail. Re-run against ALAB: all 3 criteria PASS (source_coverage, citation_quality, tool_call_accuracy), with real filing citations (10-Q 2026-05-06, 8-K 2026-06-08) alongside full market/news/analyst detail. Q7 re-verified unaffected (still 3/3 PASS).",
+      "status": "built",
       "test_cases": [
         {"ticker": "ALAB", "company": "Astera Labs"}
       ]

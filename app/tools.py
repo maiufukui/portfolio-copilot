@@ -247,10 +247,11 @@ def fetch_next_earnings_date(ticker: str, api_key: str) -> str | None:
 @tool
 def get_market_data(ticker: str) -> str:
     """Finnhub market data for a ticker: live quote (price + % change),
-    insider transactions (Form 3/4/5) in the last 30 days, and
-    institutional analyst recommendation trends (current vs. prior
-    period). Use for price/valuation questions, insider-selling
-    questions, and analyst-rating questions.
+    next scheduled earnings date, insider transactions (Form 3/4/5) in
+    the last 30 days, and institutional analyst recommendation trends
+    (current vs. prior period). Use for price/valuation questions,
+    "when does X report next" questions, insider-selling questions, and
+    analyst-rating questions.
     """
     api_key = os.environ.get("FINNHUB_API_KEY")
     if not api_key:
@@ -264,6 +265,18 @@ def get_market_data(ticker: str) -> str:
             f"Quote: ${q['price']} ({q['change_pct']}% today), "
             f"prev close ${q['prev_close']}, day range ${q['day_low']}-${q['day_high']}"
         )
+
+    # Added for eval Q11 ("when does X report next, what should I watch
+    # for") -- fetch_next_earnings_date already existed and was already
+    # used by the dashboard endpoint (get_dashboard_data below), but was
+    # never actually surfaced to the chat agent itself. That gap, not a
+    # missing Finnhub integration, was Q11's real blocker.
+    next_earnings = fetch_next_earnings_date(ticker, api_key)
+    parts.append(
+        f"Next scheduled earnings date: {next_earnings}"
+        if next_earnings
+        else "Next scheduled earnings date: not yet announced."
+    )
 
     transactions = fetch_insider_transactions(ticker, api_key)
     cutoff = datetime.now() - timedelta(days=30)

@@ -76,7 +76,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState as PrebuiltAgentState
 
-from app.tools import TOOL_BELT, get_fundamentals_health_score
+from app.tools import TOOL_BELT, get_fundamentals_health_score, search_filings
 
 load_dotenv()
 
@@ -133,7 +133,14 @@ anything about this score; do not invent a more dramatic or more reassuring conc
 evidence supports.
 
 Always cite your source (document name, or news URL + date) for any claim. If a tool returns no \
-relevant results, say so explicitly rather than guessing."""
+relevant results, say so explicitly rather than guessing.
+
+Never state that something wasn't found, filed, disclosed, or reported unless you actually \
+called the tool that would have found it -- not calling a tool is not the same as checking and \
+finding nothing. If a question spans multiple categories (e.g. filings, media/news, and \
+analyst/market data), call the relevant tool for EACH category before concluding anything about \
+it; do not generalize a finding from one category you checked (e.g. no news found) to another \
+you never checked (e.g. no filings found)."""
 
 
 class AgentState(PrebuiltAgentState):
@@ -245,6 +252,29 @@ class ChatResult(NamedTuple):
     tools_used: list[str]
 
 
+# Q9 fix (Task 5 finding): test_q9.py showed the agent reliably
+# generalizes "no news found" to "no filings found" on multi-category
+# "summarize everything -- filings, media, analyst activity" questions,
+# without ever calling a filings tool. Adding an explicit rule to
+# STABLE_SYSTEM_PROMPT above (the "never state something wasn't found...
+# unless you actually called the tool" paragraph) improved Q7 as a side
+# effect but did NOT fix Q9 -- confirmed by two separate re-runs, both
+# still FAIL on tool_call_accuracy with the exact same missed-filings
+# pattern. Rather than keep tuning prompt wording and hoping it
+# eventually outweighs the model's own generalization tendency, this
+# forces the check deterministically for questions that name filings
+# explicitly -- same deterministic-check-then-LLM-narrates pattern this
+# codebase already uses for the Fundamentals Health Score itself, not
+# another chance for the model to skip it again.
+_FILINGS_KEYWORDS = {"filing", "filings", "filed", "10-k", "10-q", "8-k", "disclosure", "disclosures"}
+_FILINGS_TOOLS = {"search_filings", "search_filings_exact"}
+
+
+def _mentions_filings(question: str) -> bool:
+    q = question.lower()
+    return any(kw in q for kw in _FILINGS_KEYWORDS)
+
+
 def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: bool = False) -> ChatResult:
     ticker = ticker.upper()
     health_score = get_fundamentals_health_score(ticker)  # computed once per turn, not per LLM call
@@ -257,11 +287,44 @@ def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: 
         },
         config=config,
     )
+    tools_used = get_tools_used(result["messages"])
+
+    if _mentions_filings(question) and not (_FILINGS_TOOLS & set(tools_used)):
+        # Call the real tool ourselves -- don't just ask the model to
+        # try again, since that's the exact thing the prompt-only fix
+        # already failed to reliably produce.
+        filings_result = search_filings.invoke({
+            "ticker": ticker,
+            "query": "recent filings, 8-K disclosures, and material events",
+        })
+        correction = (
+            "SYSTEM CHECK: your previous answer discussed filings without actually checking any. "
+            "Here is the real result of a filings search you must incorporate:\n\n"
+            f"{filings_result}\n\n"
+            "Revise your prior answer to add or correct ONLY the filings section: if this shows "
+            "relevant filings, cite them with source and date; if it shows nothing relevant, state "
+            "that as a checked result, not an assumption. Keep every other section -- market data, "
+            "news, insider activity, analyst recommendations -- EXACTLY as you already reported it "
+            "in your prior answer, with the same level of detail and the same source attributions. "
+            "Do not summarize, shorten, or drop specificity from any section you are not correcting."
+        )
+        result = graph.invoke(
+            {
+                "messages": [("human", correction)],
+                "ticker": ticker,
+                "health_score_text": str(health_score),
+            },
+            config=config,
+        )
+        tools_used = get_tools_used(result["messages"])
+        if "search_filings" not in tools_used:
+            tools_used.append("search_filings")  # forced call above, bypassed the graph's own tool node
+
     if verbose:
         print_tool_trace(result["messages"])
     return ChatResult(
         answer=result["messages"][-1].content,
-        tools_used=get_tools_used(result["messages"]),
+        tools_used=tools_used,
     )
 
 

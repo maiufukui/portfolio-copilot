@@ -82,7 +82,21 @@ def derive_missing_q4(quarterly_by_end: dict[str, dict], entries: list[dict]) ->
     Derive Q4 = FY total - (Q1 + Q2 + Q3) for any fiscal year where we
     have all three quarters plus the annual total, so deceleration/
     compression streaks are computed against 4 real quarters, not 3 with
-    a silent gap."""
+    a silent gap.
+
+    Matches quarters to a fiscal year by calendar containment (start/end
+    falling inside the annual period), NOT by trusting XBRL's own `fy`
+    field -- confirmed unreliable against real data. A later 10-Q's
+    comparative prior-year column re-reports an earlier quarter under
+    THAT LATER FILING's own fy tag (e.g. MRVL's Q1 FY26 figures reappear
+    tagged fy=2027 inside the Q1 FY27 10-Q, filed as a comparison
+    column). quarterly_series()'s "most recently filed wins" dedup then
+    keeps that mis-tagged duplicate, which silently dropped Q1 out of
+    FY2026's fy-keyed bucket -- covering found only 2 of 3 needed
+    quarters and Q4 FY2026 was never derived, even though the real data
+    was all present. Real values are identical between duplicates (only
+    the fy tag differs), so containment-based matching is safe and
+    correct here."""
     annual = []
     for e in entries:
         try:
@@ -93,18 +107,12 @@ def derive_missing_q4(quarterly_by_end: dict[str, dict], entries: list[dict]) ->
         if 350 <= (end - start).days <= 380:
             annual.append(e)
 
-    quarterly_by_fy: dict[int, list[dict]] = {}
-    for e in quarterly_by_end.values():
-        fy = e.get("fy")
-        if fy is not None:
-            quarterly_by_fy.setdefault(fy, []).append(e)
-
     derived = []
     for fy_entry in annual:
         fy = fy_entry.get("fy")
         fy_start, fy_end = fy_entry["start"], fy_entry["end"]
         covering = [
-            q for q in quarterly_by_fy.get(fy, [])
+            q for q in quarterly_by_end.values()
             if q["start"] >= fy_start and q["end"] <= fy_end
         ]
         if len(covering) != 3:
