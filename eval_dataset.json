@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Locked 13-question eval dataset for the Personal Portfolio Copilot capstone. See Personal Portfolio Copilot-prd.md Task 1 §4 for the source table and methodology note. Thesis concept retired -- questions previously comparing content against a user's free-text thesis now test either objective driver-identification (Q1) or the Fundamentals Health Score (Q2, Q7, Q10, Q11, Q13).",
+    "description": "Locked 12-question eval dataset for the Personal Portfolio Copilot capstone. See Personal Portfolio Copilot-prd.md Task 1 §4 for the source table and methodology note. Thesis concept retired -- questions previously comparing content against a user's free-text thesis now test either objective driver-identification (Q1) or the Fundamentals Health Score (Q2, Q7, Q11, Q13).",
     "scoring_methods": {
       "ragas_triad": "RAGAS Faithfulness, LLMContextRecall, FactualCorrectness against a written reference answer. Session 6 / harness shape per Session 10 run_eval.py.",
       "tool_call_goal_topic": "Tool-call accuracy (right tool, right args), goal accuracy (final answer satisfies the request), topic adherence (stays grounded in the user's actual holdings and Fundamentals Health Score, not thesis). Normalized from a LangGraph trace, per Session 6.",
@@ -124,26 +124,15 @@
       ]
     },
     {
-      "id": 10,
-      "question_template": "Given my cost basis, if I sold {company} today, what would my gain be, and does anything suggest I should?",
-      "category": "deterministic_calc",
-      "scoring_method": "hybrid",
-      "expected_behavior": "Computes exact gain/loss from stored cost basis and live price (deterministic), then separately checks current Fundamentals Health Score status -- never conflates the calculation with the recommendation.",
-      "reuses": "needs Finnhub /quote (not yet integrated) for live price + cost_basis from holdings table (not yet built) + the Fundamentals Health Score check (Q13's logic)",
-      "status": "not_built",
-      "test_cases": [
-        {"ticker": "AAPL", "company": "Apple", "shares": 25, "cost_basis_per_share": 180.00}
-      ]
-    },
-    {
       "id": 11,
       "question_template": "When does {company} report next, and what should I watch for based on its current Fundamentals Health Score?",
       "category": "tool_calling",
       "scoring_method": "tool_call_goal_topic",
       "expected_behavior": "Surfaces the next earnings date and names the specific sub-signal(s) -- revenue growth, margin, insider activity, leadership stability -- that the upcoming report will test, especially any currently at Monitor or At Risk.",
-      "reuses": "needs Finnhub /calendar/earnings (not yet integrated, same GET pattern as fetch_recommendation_trends) + the Fundamentals Health Score's current sub-signal statuses (Q13's logic)",
-      "status": "not_built",
+      "reuses": "test_q11.py: precomputes real ground truth (fetch_next_earnings_date + get_fundamentals_health_score, both already used by the live agent) before asking the agent anything, then deterministically checks the response cites the exact earnings date and names every flagged sub-signal, plus an LLM judge for goal_accuracy/topic_adherence/no_overclaiming. Two test cases: MRVL (has a real monitor/at_risk signal to catch) and NBIS (insufficient_data on revenue/margin -- tests honest reporting of that gap, not invention).",
+      "status": "built",
       "test_cases": [
+        {"ticker": "MRVL", "company": "Marvell"},
         {"ticker": "NBIS", "company": "Nebius"}
       ]
     },
@@ -164,9 +153,9 @@
       "question_template": "Has anything about {company}'s underlying business gotten worse since I bought it -- revenue, margins, insider activity, or leadership?",
       "category": "hybrid",
       "scoring_method": "hybrid",
-      "expected_behavior": "Runs the four-signal Fundamentals Health Score (Task 2 §4): reports each sub-signal's status and the overall worst-of rollup, with the specific numbers/events driving any non-intact rating.",
-      "reuses": "insider sub-signal partially built (test_q5.py, needs the 10b5-1 materiality filter added); revenue/margin sub-signals need SEC EDGAR XBRL company-facts API (not built); leadership sub-signal needs 8-K Item 5.02 detection (not built)",
-      "status": "not_built",
+      "expected_behavior": "Runs the four-signal Fundamentals Health Score (Task 2 §4): reports each sub-signal's status and the overall worst-of rollup, with the specific numbers/events driving any non-intact rating. Deliberately scored as a CURRENT-STATE answer, not a true point-in-time diff against date_purchased -- no historical health-score snapshot exists anywhere in this codebase, so a correct response reports current status honestly rather than fabricating a since-you-bought-it comparison it has no data to support (see PRD Open Items).",
+      "reuses": "test_q13.py: precomputes real ground truth (get_fundamentals_health_score, already computed for every live agent turn) before asking the agent anything, then deterministically checks all four sub-signal names are addressed and the worst-of overall status is reflected, plus an LLM judge for rollup_accuracy/signal_completeness/honest_framing. Three-attempt fix history: (1) prompt-only rule in STABLE_SYSTEM_PROMPT -- did not resolve it, re-run showed the identical 'since you bought...' phrase and the identical FAIL; (2) a code-level guard checking the response for a fixed list of since-purchase phrases -- also insufficient, the very next re-run reworded the same overclaim as 'have not gotten worse... remain intact or improved', evading every literal phrase while preserving the identical problem; (3) replaced the keyword check with an LLM classifier that judges the response semantically (does it imply a before/after comparison without historical data, regardless of exact wording), gated by a cheap keyword pre-filter on the QUESTION so the extra model call only runs on questions shaped to invite this framing. Not yet re-verified against a real run.",
+      "status": "partially_built",
       "test_cases": [
         {"ticker": "ALAB", "company": "Astera Labs", "date_purchased": "2025-08-01"}
       ]

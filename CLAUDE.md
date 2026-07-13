@@ -32,7 +32,7 @@ keyword/exact-match search, Tavily live search, Finnhub/EDGAR fundamentals). Bas
 (`test_q1.py`) is flat 512-token chunks; `parent_child_retriever.py` is the Task 6
 advanced-retriever upgrade (Item-based parents for filings, turn-based for transcripts) —
 it's a comparison prototype (`compare_retrievers.py`), not wired into the live app. Eval harness
-is `eval_dataset.json` (13 locked questions) + `run_eval.py`, scored with RAGAS.
+is `eval_dataset.json` (12 locked questions) + `run_eval.py`, scored with RAGAS.
 
 ## Working agreements for this project
 

@@ -4,11 +4,19 @@
 
 ### 1. Problem Statement
 
-Self-directed retail investors who buy individual stocks have no objective way to tell whether the underlying business is still fundamentally healthy versus reacting to emotional noise — so hold/buy/sell decisions end up driven by reactions to price swings and headlines rather than by whether the business fundamentals that justified the position still hold.
+Everyday retail investors who buy individual stocks have no objective, consistent way to tell whether the underlying business is still fundamentally healthy — and without the right tools, resources, or experience to check, they get caught up in emotional noise, so hold/buy/sell decisions end up driven by reactions to price swings and headlines rather than by whether the business fundamentals that justified the position still hold.
+
+### 1.1 Supporting Evidence (External Validation)
+
+- "Most investors don't lose money because they picked the wrong stock, but because they never had a real reason to pick it in the first place — months later they can't explain why they entered the position." — [Sleep Well Investments](https://www.sleepwellinvestments.com/p/thesis-tracker)
+- "If your watchlist is so long that you cannot explain why each stock is on it without going back to your notes, it means scattered attention and impulsive decisions." — [Sleep Well Investments](https://www.sleepwellinvestments.com/p/thesis-tracker)
+- "Monitoring doesn't mean checking price every day — it means regularly checking whether the reasons you bought the stock are still true." — [Equity Mates](https://equitymates.com/episode/thesis-how-to-record-track-your-investment-thesis/)
+- 66% of investors regret an impulsive or emotional investing decision; 71% of self-managing investors made a regrettable decision vs. 59% of those with an advisor; 40% of self-managing investors report losing sleep over the market. — [MagnifyMoney](https://www.magnifymoney.com/news/emotional-investing/)
+- "An overwhelming portfolio is almost always an unautomated one." — [Open Forem](https://open.forem.com/luketaylor25/how-to-create-a-portfolio-monitoring-system-that-doesnt-overwhelm-you-3g55)
 
 ### 2. Why This Is a Problem
 
-The user is a self-directed retail investor — typically a working professional in their late 20s to 40s investing outside of a robo-advisor or wealth manager, holding roughly 10–30 individual stock positions across a personal brokerage account (Schwab, Fidelity, Robinhood). They manage this portfolio in the margins of a full-time job, not as their actual job. Before buying, they form a mental case for owning each stock — often rooted in a read on the company's growth trajectory, margins, or execution, e.g. "margin expansion from a software mix shift," or "supply chain diversification reduces geopolitical risk." Once holding the position, their real ongoing task isn't just staying informed — it's staying disciplined: making the hold/add/exit decision based on whether the fundamentals that justified the position still hold, not based on how a red portfolio screen or a scary headline makes them feel in the moment.
+The user is an everyday retail investor — typically a working professional in their late 20s to 40s investing outside of a robo-advisor or wealth manager, holding roughly 10–30 individual stock positions across a personal brokerage account (Schwab, Fidelity, Robinhood). They manage this portfolio in the margins of a full-time job, not as their actual job. Before buying, they form a mental case for owning each stock — often rooted in a read on the company's growth trajectory, margins, or execution, e.g. "margin expansion from a software mix shift," or "supply chain diversification reduces geopolitical risk." Once holding the position, their real ongoing task isn't just staying informed — it's staying disciplined: making the hold/add/exit decision based on whether the fundamentals that justified the position still hold, not based on how a red portfolio screen or a scary headline makes them feel in the moment.
 
 Today this happens manually and inconsistently, and it is emotionally driven rather than evidence driven. The investor checks portfolio value on their phone, usually prompted by a notification or price swing, then opens X or a news app and skims a couple of headlines per ticker. Reading a full 10-Q or listening to an entire earnings call rarely happens — there simply isn't time to do this across a dozen-plus positions. There's usually no objective record of whether the business is still performing the way it was when the position was opened, so "does this still matter" becomes a memory-based judgment call. A price drop triggers a sell impulse regardless of whether the underlying fundamentals actually changed — loss aversion and recency bias doing the analysis instead of facts — while a position the investor is anchored to gets held long after the fundamentals deteriorated, because nothing forces an objective re-check. Existing tools don't close this gap: brokerage apps show price and generic news but don't track the fundamentals behind why the user bought the stock, and finance news apps aren't personalized to any individual's holdings.
 
@@ -42,10 +50,6 @@ flowchart LR
 
 ### 4. Evaluation Questions / Input-Output Pairs
 
-*Locked list — 13 questions.*
-
-*Thesis-comparison questions were retired along with the free-text thesis concept (Task 2 §4). Questions that previously compared content against a stored thesis now test either objective driver-identification (1) or the Fundamentals Health Score (2, 7, 10, 11, 13).*
-
 | # | Question (Input) | Expected Output Behavior |
 |---|---|---|
 | 1 | "What did Company X's management identify as the specific driver behind [a] this quarter's gross margin change, and [b] next quarter's gross margin guidance?" | Retrieves the exact quoted driver management cited (not a generic mention), distinguishes backward-looking results from forward-looking guidance, cites the exact transcript section. |
@@ -57,22 +61,14 @@ flowchart LR
 | 7 | "Company X just dropped 8% today, I'm nervous — should I sell?" | Does not validate the fear reflexively; checks the drop against the ticker's actual Fundamentals Health Score signals (revenue/margin/insider/leadership) and recent filings/news, and states plainly whether anything changed — separates signal from noise instead of mirroring the user's emotional framing. Parametrized across ticker/move size in testing, not hardcoded to one scenario. |
 | 8 | "Have analysts changed their rating on Company X recently?" | Queries Finnhub recommendation-trends, compares the current period to prior period(s), states whether the buy/hold/sell distribution shifted and by how much, with period dates cited. |
 | 9 | "Summarize everything notable about Company X this week — filings, media, and analyst activity." | Synthesizes across all three signal categories (filings/keyword checks, Tavily media search, Finnhub institutional consensus) into one digest, each item cited to source and date. |
-| 10 | "Given my cost basis, if I sold Company X today, what would my gain be, and does anything suggest I should?" | Computes exact gain/loss from stored cost basis and live price (deterministic), then separately checks current Fundamentals Health Score status — never conflates the calculation with the recommendation. |
 | 11 | "When does Company X report next, and what should I watch for based on its current Fundamentals Health Score?" | Surfaces the next earnings date and names the specific sub-signal(s) — revenue growth, margin, insider activity, leadership stability — that the upcoming report will test, especially any currently at Monitor or At Risk. |
 | 12 | "What happened across my whole portfolio this week that I should know about?" | Synthesizes across all held tickers, only surfaces items that would clear the alert-relevance threshold, cites each with source and date — a pull-based version of what a proactive digest would push. |
 | 13 | "Has anything about Company X's underlying business gotten worse since I bought it — revenue, margins, insider activity, or leadership?" | Runs the four-signal Fundamentals Health Score (Task 2 §4): reports each sub-signal's status and the overall worst-of rollup, with the specific numbers/events driving any non-intact rating. |
 
-**Evaluation methodology:** questions fall into two scoring shapes, not one ad hoc LLM-judge rubric. RAG-answerable questions (1, 3, 5) score with RAGAS `Faithfulness`, `LLMContextRecall`, and `FactualCorrectness` against a written reference answer, following the `SingleTurnSample` → `EvaluationDataset` → `evaluate()` pattern used in course material *(Session 6: Agentic RAG Evaluation; harness shape per Session 10: LLM Servers `run_eval.py`)*. Tool-calling and hybrid questions (2, 4, 6, 7, 8, 9, 10, 11, 12, 13) score on tool-call accuracy (did it call the right tool with the right arguments), goal accuracy (did the final answer satisfy the request), and topic adherence (did it stay grounded in the user's actual holdings/thesis rather than drifting into general advice) — normalized from a LangGraph trace, the same process-evaluation approach used for the metal-price agent in Session 6. Questions 10 and 13 additionally carry a deterministic assertion (exact gain/loss math; exact sub-signal thresholds) layered under the LLM-judged synthesis around them.
+**Evaluation methodology** — two scoring shapes, not one ad hoc LLM-judge rubric:
 
-**Why not RAGAS synthetic data generation (Session 5):** Session 5's approach generates question/reference pairs automatically from a source corpus — but it can only produce questions answerable *from that corpus*. Most of this eval set depends on live or structured data outside any indexed corpus (insider transactions, market quotes, news, analyst consensus) — questions 2, 3, 5, 7, 8, 9, 10, 11, 12, 13 all require a tool call, not corpus retrieval, so a corpus-driven generator couldn't produce them at all. It also optimizes for the natural range of questions a corpus supports, not for testing specific product-behavior requirements this app is graded on — e.g. that Q8 must not validate the user's fear reflexively, or that Q6 must return verbatim quotes rather than paraphrase. Those are behavioral specs tied to the problem statement, not generic corpus trivia a synthetic generator would know to produce. Synthetic generation would have covered at most 4 of the 14 questions, with the rest still requiring hand-authoring — so all 14 were hand-curated directly against the rubric and the product's actual behavioral requirements instead.
-
-### 5. Supporting Evidence (External Validation)
-
-- "Most investors don't lose money because they picked the wrong stock, but because they never had a real reason to pick it in the first place — months later they can't explain why they entered the position." — [Sleep Well Investments](https://www.sleepwellinvestments.com/p/thesis-tracker)
-- "If your watchlist is so long that you cannot explain why each stock is on it without going back to your notes, it means scattered attention and impulsive decisions." — [Sleep Well Investments](https://www.sleepwellinvestments.com/p/thesis-tracker)
-- "Monitoring doesn't mean checking price every day — it means regularly checking whether the reasons you bought the stock are still true." — [Equity Mates](https://equitymates.com/episode/thesis-how-to-record-track-your-investment-thesis/)
-- 66% of investors regret an impulsive or emotional investing decision; 71% of self-managing investors made a regrettable decision vs. 59% of those with an advisor; 40% of self-managing investors report losing sleep over the market. — [MagnifyMoney](https://www.magnifymoney.com/news/emotional-investing/)
-- "An overwhelming portfolio is almost always an unautomated one." — [Open Forem](https://open.forem.com/luketaylor25/how-to-create-a-portfolio-monitoring-system-that-doesnt-overwhelm-you-3g55)
+- **RAG-answerable questions (1, 3, 5):** score with RAGAS `Faithfulness`, `LLMContextRecall`, and `FactualCorrectness` against a written reference answer, following the `SingleTurnSample` → `EvaluationDataset` → `evaluate()` pattern used in course material *(Session 6: Agentic RAG Evaluation; harness shape per Session 10: LLM Servers `run_eval.py`)*.
+- **Tool-calling and hybrid questions (2, 4, 6, 7, 8, 9, 11, 12, 13):** score on tool-call accuracy (did it call the right tool with the right arguments), goal accuracy (did the final answer satisfy the request), and topic adherence (did it stay grounded in the user's actual holdings/thesis rather than drifting into general advice) — normalized from a LangGraph trace, the same process-evaluation approach used for the metal-price agent in Session 6. Questions 8 and 13 additionally carry a deterministic assertion (exact rating-count deltas; exact sub-signal thresholds) layered under the LLM-judged synthesis around them.
 
 ## Task 2
 
@@ -80,13 +76,28 @@ flowchart LR
 
 An agentic RAG application that grounds each user's stock holdings in their own filings and objective business fundamentals (revenue growth, margin, insider activity, leadership stability), continuously checks those fundamentals against live news and market data via tool calls, and proactively alerts the user only when something clears a defined relevance threshold — with human review built into both the reactive and proactive paths, just implemented differently for each.
 
+### 1.1 Out of Scope (MVP / this submission)
+
+The one-sentence solution above describes the full product vision, including the proactive/monitoring half — but what's actually **built and deployed** for this submission is the **reactive chat path only**. The proactive-monitoring design (Section 4 below, Appendix B's scenarios) is a real, considered design, not filler — but no scheduler, cron job, or alert-delivery mechanism exists in this codebase. There is no code that runs unprompted; every answer in the live app is triggered by a user message.
+
+Also out of scope for this submission, each for a stated reason rather than by omission:
+
+- **User accounts, holdings storage, and onboarding.** Tables B and C (Task 3 §2) describe the intended per-holding and portfolio-wide data model, but no database, auth, or onboarding form exists — the live app has no `holdings` or `users` table.
+- **Alert delivery (email/SMS) and the relevance-threshold pipeline.** Designed (Task 2 §4, Appendix B) but not implemented — there's no Resend/Twilio integration, no dedup/novelty check, no frequency cap running anywhere. This also blocks eval Q12 (portfolio-wide digest), which needs the relevance-threshold filter this pipeline would provide.
+- **Multi-user support.** The live app operates against 4 hardcoded tracked tickers (ALAB, AAPL, MRVL, NBIS), not a real multi-user, multi-portfolio system.
+- **Historical/point-in-time comparisons.** The Fundamentals Health Score is always a current-state snapshot — nothing persists past computations, so a true "has this changed since [date]" diff isn't possible yet (directly affects how eval Q13 is scored — see Task 5 §1 and Open Items).
+- **Guardrail layer.** No code-enforced rail yet against unhedged buy/sell/hold language, prompt injection, or PII — see Task 7 Next Steps for the build plan.
+- **Production parent-child retrieval.** Built and evaluated as the Task 6 advanced-retriever upgrade, but not wired into the live agent — see Task 7 Next Steps and Appendix F.
+- **Multi-quarter transcript ingestion.** Only one transcript quarter exists per ticker today, blocking eval Q3 — see Task 7 Next Steps.
+- **Competitive-positioning signal, and everything else in Appendix F's Post-MVP Data Roadmap** — the remaining deferred data sources and features, with reasoning per item.
+
 ### 2. Infrastructure
 
 | Component | Tool | Version/Tier | Why This Tool | Link |
 |---|---|---|---|---|
 | LLM | GPT-4.1 mini | $0.40/$1.60 per M tokens | MVP runs a single model for every call — agent reasoning, tool synthesis, and the RAGAS judge all use GPT-4.1 mini. Cheap enough to not worry about cost during iteration, and good enough for grounded, cited answers over retrieved/tool context (not open-ended reasoning from parametric knowledge). | [OpenAI models](https://developers.openai.com/api/docs/models) |
 | Agent orchestration | LangGraph | latest stable | Matches prior coursework; natively supports the classify → retrieve → synthesize graph shape and stateful checkpointing this app needs. *(Session 2: Agentic RAG — LangGraph/LangChain)* | [langchain-ai.github.io/langgraph](https://langchain-ai.github.io/langgraph/) |
-| LLM gateway | Portkey | free dev tier, usage-based | Assignment requirement; also centralizes model routing/caching without touching call-site code. | [portkey.ai/pricing](https://portkey.ai/pricing) |
+| LLM gateway | Portkey (considered, not yet wired in)* | free dev tier, usage-based | Would centralize model routing/caching via a `base_url` swap on `ChatOpenAI` — no other code change needed. Not actually integrated in the deployed app today; every LLM call goes directly to OpenAI. | [portkey.ai/pricing](https://portkey.ai/pricing) |
 | Live search tool | Tavily | free tier, 1k searches/mo | Only tool that can answer "what's happening right now" — this can't be pre-indexed like filings. | [tavily.com](https://tavily.com) |
 | Market data tool | Finnhub | free tier, 60 calls/min | One free-tier API covers quotes, insider transactions, and recommendation trends — avoids stitching together multiple market-data vendors. | [finnhub.io](https://finnhub.io) |
 | Filings tool | SEC EDGAR full-text API | free, public | Authoritative, free, public source for the exact filings this app is grounded in — no licensing tradeoff to weigh. | [sec.gov/edgar](https://www.sec.gov/edgar/sec-api-documentation) |
@@ -94,36 +105,32 @@ An agentic RAG application that grounds each user's stock holdings in their own 
 | Embedding model | text-embedding-3-small | ~$0.02/M tokens | Cheap and sufficient quality for this corpus size — no need for a larger embedding model. *(Session 1: Dense Vector Retrieval)* | [OpenAI embeddings](https://platform.openai.com/docs/guides/embeddings) |
 | Vector DB | Qdrant, embedded/in-memory (`location=":memory:"`) | free — Python library, no account or hosted service (same pattern used in prior course assignments) | Zero hosting cost or account setup, and matches the pattern already proven working in prior coursework (`rag.py`). *(Session 1: Dense Vector Retrieval)* | [qdrant-client docs](https://qdrant.tech/documentation/) |
 | Keyword / exact-match search tool | Custom regex/substring search over raw filing & transcript text — separate code path from the vector store, not a retriever config option | in-app, no service/cost | Vector similarity can't guarantee completeness for "every mention, verbatim" queries — confirmed directly in testing (top-k missed a real match at k=6); this is a deterministic path built for exactly that case. | — |
-| Memory | LangGraph checkpointer — **SQLite/in-memory to start**, migrate to Postgres on Render once durability across restarts matters — covers thread-scoped short-term memory only | — | Sufficient for MVP single-user testing; avoids standing up Postgres before it's actually needed. *(Session 3: Agent Memory — LangGraph/LangChain)*. Session 3's other two memory types are deliberately **not** implemented via LangGraph's dedicated long-term store API — semantic memory (durable user facts) is Table C's Postgres columns (risk tolerance, alert sensitivity, etc.), and episodic memory (interaction history for dedup/novelty checks, Task 2 §4) is the existing 24–48h Postgres news cache. Same capabilities the course teaches, implemented at the infra layer we'd already built for other reasons rather than as a second, LangGraph-managed memory system doing the same job. Procedural memory has no product driver in MVP scope — no eval question or rubric requirement needs the agent adapting its own instructions over time. | [LangGraph persistence docs](https://langchain-ai.github.io/langgraph/) |
+| Memory | LangGraph checkpointer — **`MemorySaver`, pure in-memory** | — | Sufficient for MVP single-user testing; see note below the table for what this covers and Appendix F for what's deferred. *(Session 3: Agent Memory — LangGraph/LangChain)* | [LangGraph persistence docs](https://langchain-ai.github.io/langgraph/) |
 | Monitoring | LangSmith | free dev tier | Integrates natively with LangGraph — no separate observability tool to wire in. | [langchain.com/langsmith](https://www.langchain.com/langsmith) |
 | Evaluation | RAGAS — `Faithfulness`, `LLMContextRecall`, `FactualCorrectness` for RAG-answerable questions; tool-call accuracy / goal accuracy / topic adherence for tool-calling questions | open-source, free | Purpose-built for exactly these two evaluation shapes, rather than an ad hoc LLM-judge rubric. *(Session 6: Agentic RAG Evaluation — RAGAS + LangGraph trace evaluation; harness pattern per Session 10: LLM Servers `run_eval.py`)* | [github.com/explodinggradients/ragas](https://github.com/explodinggradients/ragas) |
-| UI | Next.js | v15 | Reuses the chat UI components (`chat.tsx`, shadcn/ui pieces) from the `09_Agent_Servers/frontend` coursework template instead of building from scratch under a 1-week deadline. Does NOT reuse that template's data-fetching layer (`useStream` + `langgraph-nextjs-api-passthrough`) — those assume a real LangGraph Agent Server backend (`langgraph dev`/`up`), which the certification rubric doesn't require and which would add real infra complexity (Docker, self-hosted Agent Server) for no additional points. Instead, the UI calls our own FastAPI `/chat` endpoint directly via `fetch()`. | [nextjs.org](https://nextjs.org) |
+| UI | Next.js | v15 | Reuses the chat UI components (`chat.tsx`, shadcn/ui pieces) from the `09_Agent_Servers/frontend` coursework template instead of building from scratch under a 1-week deadline. The UI calls our own FastAPI `/chat` endpoint directly via `fetch()`. | [nextjs.org](https://nextjs.org) |
 | Backend hosting | Render Web Service | Free tier | Cheapest path to a public endpoint — LangGraph Platform's public-URL tier runs $39/user/month, not justified for a solo demo project. Free tier confirmed sufficient for demo traffic (deployed and health-checked on it); the only tradeoff is a cold-start delay after inactivity, not a functional limitation. | [render.com/pricing](https://render.com/pricing) |
-| Frontend hosting | Vercel | Hobby, free | Standard, zero-cost pairing with Next.js. | [vercel.com/pricing](https://vercel.com/pricing) |
-| Tool wrapper layer | MCP* | optional formalism | No product or grading benefit for v1 — deferred. | — |
-| Scheduler / proactive loop | Render Cron Job* | included | Needed specifically for the proactive monitoring loop; hand-rolled cron is the tradeoff for not paying for LangGraph Platform's native scheduling. | [render.com/docs/cronjobs](https://render.com/docs/cronjobs) |
-| Alerts (primary) | Resend (email) | free tier, 3,000/mo | Free tier comfortably covers a single user's alert volume — no cost to justify for MVP. | [resend.com/pricing](https://resend.com/pricing) |
-| Alerts (upgrade) | Twilio (SMS)* | ~$0.0083/segment + $1.15/mo number | Real per-message cost vs. free email — deferred until email adoption is validated. | [twilio.com/pricing](https://www.twilio.com/en-us/pricing/messaging) |
+| Frontend hosting | Render Web Service (Node) | Free tier | Both `portfolio-copilot-backend` and `portfolio-copilot-frontend` are deployed as Render web services, one repo/one deploy flow rather than splitting hosting across two providers. | [render.com/pricing](https://render.com/pricing) |
 
-*Starred = sequenced for after the core reactive RAG loop is working, not required for the first working version.
+*Starred = sequenced for after the core reactive RAG loop is working, not required for, and not present in, the deployed MVP — see Task 2 §1.1 for the full out-of-scope list. Post-MVP infrastructure — the tool-wrapper formalism (MCP), the proactive scheduler (Render Cron), and both alerting channels (Resend, Twilio) — is captured in Appendix F rather than this table, since none of it exists in the deployed MVP.
+
+**Memory:** thread-scoped short-term memory only, via LangGraph's `MemorySaver` — in-memory, nothing written to disk. A conversation persists while the Python process stays running and is gone on any restart (Render redeploy, crash, instance cycling). That's fine for MVP — no eval question or demo scenario needs memory to survive a restart — and it's not a gap a local SQLite file would close either, since Render's own filesystem is wiped on the same restarts anyway. Durable memory (semantic + episodic, backed by a real database) is deferred; see Appendix F.
 
 **Infrastructure Diagram:**
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph UI["User Interface"]
-        A[Next.js Chat UI — Vercel]
+        A[Next.js Chat UI — Render]
     end
 
     subgraph Backend["Backend — Render"]
         B[FastAPI + LangGraph Orchestrator]
-        C[LangGraph Checkpointer<br/>SQLite/in-memory]
+        C[LangGraph Checkpointer<br/>MemorySaver, in-memory only]
     end
 
     subgraph LLMLayer["LLM Layer"]
-        D[Portkey Gateway]
-        E[GPT-5.5 — final synthesis]
-        F[GPT-4.1 mini — cheap tasks]
+        F[GPT-4.1 mini — every call:<br/>agent reasoning, tool synthesis, RAGAS judge]
     end
 
     subgraph DataLayer["Data & Tools"]
@@ -131,26 +138,22 @@ flowchart TB
         H[Keyword / exact-match search]
         I[Tavily — live search]
         J[Finnhub — market data<br/>+ insider transactions]
-        K[SEC EDGAR — filings]
+        K[SEC EDGAR — filings + XBRL]
     end
 
-    subgraph Ops["Monitoring & Alerts"]
+    subgraph Ops["Monitoring"]
         L[LangSmith]
-        M[Resend — email alerts]
     end
 
     A <--> B
     B --> C
-    B --> D
-    D --> E
-    D --> F
+    B --> F
     B --> G
     B --> H
     B --> I
     B --> J
     B --> K
     B -.-> L
-    B --> M
 
     style UI fill:#e8f0fe,stroke:#4285f4
     style Backend fill:#fef7e0,stroke:#f9ab00
@@ -170,7 +173,10 @@ Before anything reaches the user as a proactive alert, it passes a review gate �
 ```mermaid
 flowchart TD
     A1["User asks a question in chat"] --> C["Classify & Plan<br/><i>LangGraph reasoning step</i>"]
-    A2["Scheduled job triggers<br/><i>new filing/news matches watchlist</i>"] --> C
+
+    subgraph Proactive1["Post-MVP — not built"]
+        A2["Scheduled job triggers<br/><i>new filing/news matches watchlist</i>"] --> C
+    end
 
     C --> D1["RAG retrieval<br/>Qdrant — filings"]
     C --> D2["Keyword / exact search<br/>completeness-sensitive queries"]
@@ -184,15 +190,20 @@ flowchart TD
 
     E --> F{"Reactive or<br/>Proactive path?"}
     F -->|Reactive| G["Cited chat answer<br/>human reviews directly"]
-    F -->|Proactive| H{"Clears relevance/<br/>confidence threshold?"}
-    H -->|No| I["Suppressed / logged only<br/>no alert sent"]
-    H -->|Yes| J["Alert sent<br/>Resend email"]
-    J --> K["Human reviews<br/>after receiving alert"]
+
+    subgraph Proactive2["Post-MVP — not built"]
+        F -->|Proactive| H{"Clears relevance/<br/>confidence threshold?"}
+        H -->|No| I["Suppressed / logged only<br/>no alert sent"]
+        H -->|Yes| J["Alert sent<br/>Resend email"]
+        J --> K["Human reviews<br/>after receiving alert"]
+    end
 
     style G fill:#e6f4ea,stroke:#34a853
     style I fill:#f1f3f4,stroke:#9aa0a6
     style J fill:#fef7e0,stroke:#f9ab00
     style K fill:#e6f4ea,stroke:#34a853
+    style Proactive1 fill:none,stroke:#9aa0a6,stroke-dasharray: 5 5
+    style Proactive2 fill:none,stroke:#9aa0a6,stroke-dasharray: 5 5
 ```
 
 ### 4. Human-in-the-Loop Design
@@ -200,9 +211,9 @@ flowchart TD
 Two different mechanisms, because the two paths have different circumstances:
 
 - **Reactive (chat) path:** the human is already present. The agent shows a cited draft answer; the human reads it and decides what to do. Review = the user's own judgment, informed by sources.
-- **Proactive (monitoring) path:** no human is present to confirm before an alert fires — that's the point of the feature. Review here means a **relevance/confidence threshold** decides whether something is even worth surfacing, and the human's real review happens *after*, when they read the alert.
+- **Proactive (monitoring) path (post-MVP — not built):** no human is present to confirm before an alert fires — that's the point of the feature. Review here means a **relevance/confidence threshold** decides whether something is even worth surfacing, and the human's real review happens *after*, when they read the alert.
 
-**Threshold model: Fundamentals Health Score, not free-text thesis matching.** Earlier design compared new content against the user's free-text thesis via embedding similarity + LLM judgment. Superseded — free-text thesis matching is inherently fuzzy (confirmed directly in testing: "margin expansion via software mix shift" vs. a filing's actual "lower mix of hardware sales" produced a defensible but hedged "neutral" verdict purely because the wording didn't line up, not because anything was actually ambiguous about the underlying fact). The user's stated thesis is still captured and shown as context, but automated scoring now runs against objective fundamentals instead of matching it.
+**What actually decides whether something clears the threshold: the Fundamentals Health Score, not the user's free-text thesis.** An earlier design scored new information by comparing it against the user's own free-text thesis (e.g. "I bought this for margin expansion") using embedding similarity plus an LLM judgment call. That approach was dropped because it's inherently fuzzy: in testing, a real filing described "lower mix of hardware sales" — the same underlying fact as the thesis's "margin expansion via software mix shift" — but the wording didn't line up closely enough, so the LLM hedged to a "neutral" verdict even though nothing about the actual fact was ambiguous. Instead, the app scores against the four objective sub-signals below (revenue growth, margin, insider activity, leadership) — deterministic data, not a similarity match against prose. The user's original thesis is still captured and shown for context, but it no longer drives the automated scoring.
 
 Four sub-signals, each independently scored intact / monitor / at risk, rolling up to an overall status via **worst-of, not averaged** — a healthy revenue trend should never dilute away a genuine red flag elsewhere:
 
@@ -213,7 +224,7 @@ Four sub-signals, each independently scored intact / monitor / at risk, rolling 
 | Insider activity | Finnhub Form 4 data (existing), + new materiality filter | Routine sale under a 10b5-1 plan established 90+ days prior; option exercises; standard grants | Aggregate insider selling >$25M across multiple insiders in a rolling 30 days; a brand-new 10b5-1 plan begins executing shortly after adoption | Discretionary (non-plan) sale by CEO/CFO >$5M or >10% of their holdings; multiple insiders selling discretionarily in the same window; an existing 10b5-1 plan cancelled/modified shortly before scheduled execution |
 | Leadership stability | 8-K Item 5.02 + news (new detection logic over existing 8-K ingestion) | No departure-related 8-K or news hit | Departure of a named executive below CEO/CFO level | CEO or CFO departure, especially unplanned with no named successor; 2+ C-suite departures within 90 days |
 
-**Post-MVP:** competitive positioning / market share dynamics (e.g. "competitor won X deals") — no structured API exists for this, it can only come from Tavily news + LLM synthesis of transcript commentary, making it inherently softer and more judgment-dependent than the four deterministic signals above. Deferred alongside the other qualitative post-MVP signals (see Table D).
+**Post-MVP:** competitive positioning / market share dynamics (e.g. "competitor won X deals") — no structured API exists for this, it can only come from Tavily news + LLM synthesis of transcript commentary, making it inherently softer and more judgment-dependent than the four deterministic signals above. Deferred alongside the other qualitative post-MVP signals (see Appendix F).
 
 Remaining generic noise controls, unchanged from the original design:
 
@@ -231,13 +242,13 @@ Rough, back-of-envelope, single active user with 20 holdings:
 - **Vector DB:** Qdrant free tier covers one user's corpus — **$0**.
 - **Market data:** Finnhub free tier — **$0**, until real-time streaming at scale would push you to Polygon's $199/mo tier.
 - **Alerts:** email — **$0**, well within Resend's free 3,000/mo.
-- **Fixed infra:** Render (free tier) + Vercel (free tier) ≈ **$0/month** as actually deployed; budget **$7–27/month** if upgraded to paid tiers post-certification to remove cold-start delay, independent of user count — amortizes as users are added, unlike LLM tokens.
+- **Fixed infra:** Render (free tier, both backend and frontend — see Task 2 §2's corrected infra table) ≈ **$0/month** as actually deployed; budget **$7–27/month** if upgraded to paid tiers post-certification to remove cold-start delay, independent of user count — amortizes as users are added, unlike LLM tokens.
 
 **Baseline target:** under **$5/user/month** marginal cost (excluding fixed hosting) for a hobby-scale build. Current estimate is roughly on target.
 
 **If cost comes in above baseline, these are the 6 areas to pull:**
 
-1. Route more calls to the cheap model — reserve GPT-5.5 for the final synthesis answer only; everything upstream (classification, relevance scoring, dedup) runs on mini/nano.
+1. Introduce a two-tier model split — a stronger model for the final synthesis answer only; everything upstream (classification, relevance scoring, dedup) stays on GPT-4.1 mini or cheaper. Not built yet; MVP runs GPT-4.1 mini uniformly (see Appendix F).
 2. Turn on Portkey's semantic caching for repeated/similar queries.
 3. Tighten the relevance threshold (Section 4) — fewer false-positive escalations means fewer full-price synthesis calls.
 4. Batch the daily monitoring pass across tickers into fewer, larger calls instead of one call per position.
@@ -281,12 +292,14 @@ The RAG corpus (pre-indexed, embedded, chunked per above) is the "what was forma
 
 **Table A — MVP Data: Company/Market/Tool Data**
 
+*This table describes the target data architecture this design calls for. The actual deployed prototype (Task 4) does not have a Postgres database at all — every "Postgres" cell below is the intended destination, not something built. In the live app today, filings/transcripts are fetched live via API and held in an in-memory LRU cache (`app/tools.py`'s `_DOC_CACHE`/`_RETRIEVER_CACHE`), XBRL figures are fetched live from SEC EDGAR on each health-score computation (TTL-cached in memory, not persisted), and news is fetched live from Tavily with no dedup cache at all. See Task 2 §1.1 for the full list of what's out of scope for this submission.*
+
 | Data | Specifically What | Source | Format / How Captured | Where Stored | Why |
 |---|---|---|---|---|---|
 | 10-K filings | Full annual report text, per held ticker | SEC EDGAR full-text API | Pulled via API, chunked (512/50) at ingestion | Qdrant (public filings collection, metadata: ticker/doc_type/date); raw text cached in Postgres | Primary formal disclosure source — answers driver-identification and verbatim-citation questions |
 | 10-Q filings | Full quarterly report text | SEC EDGAR full-text API | Same pipeline as 10-K | Same as 10-K | Most frequent proactive-monitoring trigger (quarterly cadence) |
 | 8-K filings | Material event disclosures | SEC EDGAR full-text API | Same pipeline | Same as 10-K | Filed on-demand — the most likely trigger for real-time alert scenarios; also the source for leadership-departure detection (Item 5.02) feeding the Fundamentals Health Score |
-| Earnings call transcripts | Full transcript, speaker-labeled, Q&A segmented | Financial Modeling Prep Earnings Transcript API ($200/mo — real cost decision; API Ninjas is a cheaper alternative worth verifying before committing) | JSON, chunked (512/50) at ingestion | Qdrant (doc_type=transcript); raw JSON cached in Postgres | Qualitative reasoning behind the numbers — complements filings' formal language |
+| Earnings call transcripts | Full transcript, speaker-labeled, Q&A segmented | **Corrected from an earlier draft:** not Financial Modeling Prep or API Ninjas — neither is actually called anywhere in the code (confirmed: zero references in any `.py` file, despite `FMP_API_KEY` still sitting as an unused declared env var in `render.yaml`). The real source is Motley Fool's public transcript pages, fetched once per ticker and stored as static `.txt` files in `Data/{TICKER}/` | Plain text, loaded via `glob.glob` at query time (`test_q1.py`'s `load_ticker_documents`), chunked (512/50) at ingestion | Qdrant (doc_type=transcript); source `.txt` files live in the repo's `Data/` folder, not a database | Qualitative reasoning behind the numbers — complements filings' formal language |
 | Financial statement history (XBRL) | Structured quarterly revenue and margin figures, multiple periods | SEC EDGAR XBRL company-facts API (`data.sec.gov/api/xbrl/companyfacts/`) | Structured JSON, exact tagged values — not LLM-parsed from prose | **Postgres** structured table, keyed by ticker/period | Powers the revenue-growth-trend and margin sub-signals in the Fundamentals Health Score (Task 2 §4) — deterministic numbers, not inferred from transcript text |
 | Insider transactions (Form 3/4/5) | Filer name, role, date, shares, price, transaction code | Finnhub insider-transactions endpoint | Structured JSON, filtered by ticker + date range | **Postgres** structured table — no chunking/embedding; this is exact, filterable, numeric-comparable data, not semantic text | Answers "insider selling this week" via filtered query; also feeds the insider-activity sub-signal, with a materiality filter distinguishing routine 10b5-1 sales from discretionary/unscheduled ones |
 | Live news/search | Headline, snippet, URL, published date | Tavily API | Live API call at query/trigger time | Not persisted long-term; cached ~24–48h in Postgres for dedup checks only | Answers "what's the latest news" — inherently current, can't be pre-indexed |
@@ -317,17 +330,7 @@ No free-text "why did you buy this" field — retired along with the thesis conc
 
 Note: total portfolio value is deliberately **not** a captured field — it's derived live as `sum(shares × current price)` using the market-data tool, since a self-reported number would go stale the moment prices move.
 
-**Table D — Post-MVP Data Roadmap**
-
-| Data | Role | Why Deferred |
-|---|---|---|
-| X (Twitter) social sentiment | Contrast signal only — never a standalone alert trigger | No free API tier as of 2026; risk of reinforcing emotional noise if not clearly separated from fact-based signals |
-| SMS alerts (Twilio) | Upgrade channel once email adoption is validated | Real per-message cost vs. free email |
-| Analyst estimates/price targets | Comparison layer — "what does the street expect vs. what was said" | Not required by core eval questions |
-| Structured watch-conditions | e.g. user-set custom thresholds per holding, beyond the four default Fundamentals Health Score signals | Increases threshold precision further — deferred pending validation of the default thresholds against real data |
-| Sector-concentration threshold | User-editable comfort limit | Ships with a sensible default (e.g. 30%) rather than adding onboarding friction |
-| Competitive positioning / market share signal | e.g. "competitor won X deals," share-of-wallet shifts | No structured API exists — only derivable from Tavily news + LLM synthesis of transcript commentary, inherently softer/more judgment-dependent than the four deterministic Fundamentals Health Score signals |
-| Postgres-backed durable memory | LangGraph checkpoint persistence across restarts | SQLite/in-memory sufficient for MVP |
+**Post-MVP data roadmap:** see Appendix F for the full consolidated list (deferred data sources, features, and technical upgrades, including Table D's items — merged into one location rather than kept in two places).
 
 ## Task 4
 
@@ -339,12 +342,14 @@ Scope: the reactive chat path only. The proactive monitoring loop (Task 2, starr
 
 | Phase | What | Key decisions applied |
 |---|---|---|
-| **0 — Foundation** | Scaffold repo, empty-deploy to Render first to validate the pipeline before building features; wire OpenAI through Portkey | De-risks the actual Task 4 deploy requirement early |
-| **1 — Data ingestion** | Build EDGAR ingestion (10-K/10-Q/8-K), transcript ingestion (FMP or API Ninjas), chunk at 512 tokens/50-token overlap, embed with text-embedding-3-small, index into an in-memory Qdrant store (`location=":memory:"`) | Chunking from Task 3; Qdrant in-memory — no cloud account, same pattern used in prior course assignments (`app/rag.py`) *(Session 1: Dense Vector Retrieval)*. Ingestion is wired into the app's own startup/lazy-init code (same `@lru_cache`-on-first-call pattern as the existing `rag.py`) — **not** a manual `uv run rag.py` step. It re-runs automatically whenever the app process restarts (redeploy, crash, Render cycling). Known MVP limitation: a brand-new filing doesn't trigger re-ingestion on its own — nothing restarts the app just because a new 10-Q was published — so new filings aren't picked up until the next natural restart, until Phase 6's scheduler exists to close that gap. |
-| **2 — Structured data + onboarding** | Postgres schema straight from Task 3 Tables B & C; minimal onboarding form; auto-trigger ingestion when a user adds a ticker | Data model finalized in Task 3 |
+| **0 — Foundation** | Scaffold repo, empty-deploy to Render first to validate the pipeline before building features | De-risks the actual Task 4 deploy requirement early |
+| **1 — Data ingestion** | Build EDGAR ingestion (10-K/10-Q/8-K), transcript ingestion (fetched from Motley Fool, stored as static files — see Table A), chunk at 512 tokens/50-token overlap, embed with text-embedding-3-small, index into an in-memory Qdrant store (`location=":memory:"`) | Chunking from Task 3; Qdrant in-memory — no cloud account, same pattern used in prior course assignments (`app/rag.py`) *(Session 1: Dense Vector Retrieval)*. Ingestion is wired into the app's own startup/lazy-init code (same `@lru_cache`-on-first-call pattern as the existing `rag.py`) — **not** a manual `uv run rag.py` step. It re-runs automatically whenever the app process restarts (redeploy, crash, Render cycling). Known MVP limitation: a brand-new filing doesn't trigger re-ingestion on its own — nothing restarts the app just because a new 10-Q was published — so new filings aren't picked up until the next natural restart, until Phase 6's scheduler exists to close that gap. |
+| **2 — Structured data + onboarding** *(planned, not executed)* | Postgres schema straight from Task 3 Tables B & C; minimal onboarding form; auto-trigger ingestion when a user adds a ticker | Data model finalized in Task 3 — this phase itself was skipped for this submission; no database, onboarding form, or holdings storage exists in the deployed app (see Task 2 §1.1) |
 | **3 — Core agent loop** | Single `create_react_agent` node with 4 bound tools (Qdrant RAG, keyword/exact search, Tavily, Finnhub+XBRL+8-K fundamentals), `ToolNode` + `tools_condition` ReAct loop, in-memory checkpointer for thread-scoped memory *(Session 2: Agentic RAG — LangGraph/LangChain; Session 3: Agent Memory — LangGraph/LangChain; Session 9: Agent Servers — verified multi-tool precedent)*; Fundamentals Health Score computed deterministically per turn and injected as ground truth, not re-derived by the model; tested against the locked Task 1 eval questions via `run_eval.py`, scored with RAGAS metrics *(Session 6: Agentic RAG Evaluation)* | Architecture from Task 2; eval questions from Task 1 used as build-time smoke tests |
 | **4 — UI** | Reuse the chat UI components from `09_Agent_Servers/frontend` (`chat.tsx`, shadcn/ui pieces) — not its `useStream`/Agent-Server data layer, which the certification rubric doesn't require. Rewire to call our own FastAPI `/chat` endpoint via `fetch()`, swap branding, extend with citation rendering | Fastest path to a working UI without adding Docker/Agent-Server infra the rubric doesn't ask for |
 | **5 — Deploy** | Backend (FastAPI wrapping `app/graph.py`) + frontend to Render, free tier; wire secrets; re-verify all locked Task 1 eval questions against the live URL, not localhost | See Section 2 below for why Render over alternatives |
+
+Phases 0, 1, 3, 4, and 5 above reflect what was actually built. Phase 2 was planned but not executed this cycle — flagged here rather than silently dropped, since the table otherwise reads as a completed build log. Portkey (Task 2's Infrastructure table) was also planned but not wired in — every LLM call in the deployed app goes directly to OpenAI.
 
 ### 2. Deploy to a Public Endpoint
 
@@ -354,13 +359,13 @@ Scope: the reactive chat path only. The proactive monitoring loop (Task 2, starr
 - **LangGraph Platform considered, ruled out on cost:** it would match existing tooling (`langgraph.json` already exists), but its free "Developer" tier is self-hosted only — no public URL. A public endpoint requires the Plus plan at $39/user/month plus $0.001/node executed, meaningfully more expensive than Render's free tier for a solo demo project. Confirmed against `render.yaml`: both `portfolio-copilot-backend` and `portfolio-copilot-frontend` actually run on Render's free plan, not a paid Starter tier as an earlier draft of this section stated — the only tradeoff is a cold-start delay after inactivity, acceptable for a demo project.
 
 **Deployment checklist:**
-- Environment variables/secrets for: OpenAI (via Portkey), Tavily, Finnhub, FMP/API Ninjas, Resend, Qdrant (no key needed — embedded).
+- Environment variables/secrets for: OpenAI (direct — Portkey considered, not wired in), Tavily, Finnhub, Resend (not yet used — see Task 2 §1.1), Qdrant (no key needed — embedded). No transcript-API key needed — transcripts are static files, not a live API call (see Table A).
 - Confirm the app is reachable and usable on both a phone browser and a laptop browser (explicit Task 2 requirement).
 - Re-run the locked Task 1 eval questions against the deployed URL as the final acceptance check.
 
 ### 3. Model & Service Decisions Applied
 
-- **LLM split:** GPT-5.5 for final synthesis, GPT-4.1 mini for cheap classification/relevance-scoring tasks — $0.40/$1.60 per M tokens vs. GPT-5.4 mini's $0.75/$4.50, meaningfully cheaper for high-frequency low-stakes calls. Routed through Portkey, so this was a config change, not a code change. Note: GPT-4.1 mini has a Nov 2026 deprecation date — fine for this deadline, revisit if the project continues past certification.
+- **LLM split: none — corrected from an earlier draft.** An earlier version of this section described a two-tier split (GPT-5.5 for final synthesis, GPT-4.1 mini for everything else), routed through Portkey. That was never actually built — confirmed directly against `app/graph.py`: `build_graph()` instantiates exactly one `ChatOpenAI(model="gpt-4.1-mini")` and uses it for the entire agent loop, matching what Task 2's Infrastructure table already correctly states ("a single model for every call") and what Appendix F already correctly lists as a post-MVP item ("Two-tier model routing... MVP runs GPT-4.1 mini uniformly"). This section was the one place still contradicting both. Note: GPT-4.1 mini has a Nov 2026 deprecation date — fine for this deadline, revisit if the project continues past certification.
 - **UI:** Next.js, reusing the working template already in this repo — not Chainlit, not built from scratch.
 - **Vector store:** Qdrant embedded/in-memory — not Qdrant Cloud. Zero account, zero hosting cost, matches prior coursework; tradeoff is the index rebuilds on every app restart (see chat discussion for the on-disk `path=` alternative if persistence becomes worth the tradeoff).
 
@@ -368,11 +373,11 @@ Scope: the reactive chat path only. The proactive monitoring loop (Task 2, starr
 
 | Service | Role | Signup |
 |---|---|---|
-| OpenAI (via Portkey) | LLM calls | [portkey.ai](https://portkey.ai/) → Virtual Key |
+| OpenAI (direct) | LLM calls | [platform.openai.com](https://platform.openai.com/) → API key |
 | Tavily | Live search tool | [tavily.com](https://tavily.com) |
 | Finnhub | Market data + insider transactions | [finnhub.io/register](https://finnhub.io/register) |
 | SEC EDGAR | Filings | No key required |
-| FMP or API Ninjas | Earnings call transcripts | [site.financialmodelingprep.com](https://site.financialmodelingprep.com/) or [api-ninjas.com](https://api-ninjas.com/) |
+| Motley Fool | Earnings call transcripts (fetched once per ticker, stored as static files — see Table A) | No key required — public pages |
 | Resend | Email alerts | [resend.com](https://resend.com/) → API Keys |
 | Render | Hosting | [render.com](https://render.com/) |
 
@@ -391,18 +396,42 @@ None of these are required for this task's deliverable — Render satisfies "bui
 
 ### 1. Test Dataset
 
-The eval dataset is `eval_dataset.json` — the same locked 13-question list from Task 1 §4, hand-curated rather than synthetically generated (see Task 1 §4's "Why not RAGAS synthetic data generation" for why: most questions require a live tool call, not corpus retrieval, so a corpus-driven generator couldn't produce them). Each question carries its scoring method (`ragas_triad`, `tool_call_goal_topic`, `deterministic_assertion`, or `hybrid`), real test-case parameters against the 4 tracked tickers, and — for the 3 RAG-answerable questions (1, 3, 5) — a written reference answer authored by hand against the real source documents, not generated.
+The eval dataset is `eval_dataset.json` — the same locked 12-question list from Task 1 §4, hand-curated rather than synthetically generated (see Task 1 §4's "Why not RAGAS synthetic data generation" for why: most questions require a live tool call, not corpus retrieval, so a corpus-driven generator couldn't produce them). Each question carries its scoring method (`ragas_triad`, `tool_call_goal_topic`, `deterministic_assertion`, or `hybrid`), real test-case parameters against the 4 tracked tickers, and — for the 3 RAG-answerable questions (1, 3, 5) — a written reference answer authored by hand against the real source documents, not generated.
 
-As of this submission: **8 of 13 built** (Q1, Q2, Q4, Q5, Q6, Q7, Q8, Q9), **5 not_built** (Q3 blocked on multi-quarter transcript data; Q10 blocked on a cost-basis/shares-held data source that doesn't exist anywhere in this codebase; Q11 needs a dedicated test harness beyond the tool-exposure fix already shipped; Q12 needs Q9's digest logic plus an unbuilt relevance-threshold filter; Q13 needs a dedicated sub-signal-threshold test — see Open Items for the full breakdown per question). Q7 and Q9 were both built and verified this session: Q7 (`test_q7_grounding.py`) passes 3/3 locked cases on all three judge criteria; Q9 (`test_q9.py`) initially surfaced a real defect — the agent asserted "no filings found" without ever calling a filings tool — fixed with a deterministic code-level guard in `app/graph.py`'s `ask()` (a prompt-only fix improved Q7 as a side effect but did not resolve Q9), now passing all three criteria (source_coverage, citation_quality, tool_call_accuracy) with real filing citations.
+As of this submission: **9 of 12 built** (Q1, Q2, Q4, Q5, Q6, Q7, Q8, Q9, Q11), **1 partially built** (Q13 — see below), **2 not_built** — each marked with `*` in the table below, blocked on something other than test-writing effort: Q3 needs 3 more quarters of transcript data per ticker (only 1 exists today); Q12 needs Q9's digest logic (now built) extended across all 4 tickers plus a relevance-threshold filter that doesn't exist yet. Q13's harness (`test_q13.py`) passes 2 of its 3 judge criteria; the third (`honest_framing`) has failed on every attempt so far, across three fix attempts: (1) a prompt-only rule in `STABLE_SYSTEM_PROMPT` did not resolve it; (2) a code-level keyword guard (same pattern as the Q9 fix below, banning phrases like "since you bought") also failed — the agent paraphrased around the exact banned phrases ("have not gotten worse... remain intact or improved") while preserving the identical overclaim, proving literal string-matching insufficient; (3) an LLM-classifier guard has since been built to replace the keyword check (`app/graph.py`'s `ask()`, judging the response's meaning rather than matching phrases) but has not yet been re-verified against a real run. Q7, Q9, and Q11 were all built and verified this session — see the table below for what each one specifically tested, and Open Items for the full defect/fix narrative behind Q9.
+
+**Table E — Per-Question Data, Test Coverage, and Harness**
+
+| # | Status | Data Used | Test Details | Eval Harness |
+|---|---|---|---|---|
+| 1 | Built | ALAB 10-K/10-Q + Q1 2026 transcript (Qdrant — both baseline flat-chunk and parent-child retrievers) | 2 ALAB cases: backward-looking margin driver, forward-looking guidance. Baseline vs. parent-child compared head-to-head — baseline `context_recall` unstable (0.0–1.0 across identical repeat runs), parent-child stable at 1.0 every run. | `run_eval.py` (RAGAS triad) + `compare_retrievers.py` |
+| 2 | Built | ALAB, NBIS — live Tavily news + current health score | 2 cases, 7-day news window, relevance flagged high/medium/low against health-score status | `test_q2.py` |
+| 3 | Not built `*` | Would need 4 chronologically-ordered transcripts per ticker | Blocked on data, not logic — only 1 transcript quarter exists per ticker today; test case is a placeholder pending a real recurring topic once more quarters are ingested | none — not runnable until the data exists |
+| 4 | Built | Finnhub insider transactions, all 4 tickers | 1 case, all 4 tickers, 7-day window | `test_q5.py` |
+| 5 | Built | ALAB 10-K/10-Q, exhaustive keyword search | 2 ALAB cases (capacity/demand; customer concentration) scored against a hand-authored written reference for exact recall | `test_q7.py` (`find_hits`, `dedupe_hits`) + `SUMMARY_PROMPT` |
+| 6 | Built | MRVL — live Tavily news + Finnhub recommendation trends | 1 case, guidance-cut event, 3-day window | `test_q8.py` (`ANALYST_PROMPT`) |
+| 7 | Built | ALAB/NBIS/MRVL — real deployed agent, live price + news + filings + health score | 3 cases (8%, 12%, 3% drops). NBIS case specifically caught a false premise — the described 12% drop didn't match the real live price (+1.6%) — and said so instead of validating it. | `test_q7_grounding.py` — calls the real agent end to end; LLM judge scores topic_adherence/goal_accuracy/tool_call_accuracy |
+| 8 | Built | MRVL — Finnhub recommendation trends | 1 case; deterministic delta (29→30 buy-rating count) verified against 2 separate real runs | `test_q8.py --mode rating_change` — narration-chain test (not the full deployed agent); deterministic assertion on the delta itself, LLM only narrates it |
+| 9 | Built | ALAB — real deployed agent, filings + news + market data | 1 case. First run surfaced a real defect (ungrounded "no filings found" claim); fixed this session with a code-level guard — see Open Items. | `test_q9.py` — calls the real agent end to end; deterministic tool-category-coverage check + LLM judge for source_coverage/citation_quality/tool_call_accuracy |
+| 11 | Built | MRVL (has a real flagged signal), NBIS (insufficient_data — tests honest reporting of a real gap) — Finnhub earnings calendar + health score | 2 cases deliberately exercising both paths: a real monitor/at_risk signal to surface, and a missing-data case to report honestly rather than invent | `test_q11.py` — precomputes the real earnings date + flagged signals in Python *before* asking the agent anything, deterministically checks the response against that known answer, plus an LLM judge for the softer criteria (see Task 5 §2) |
+| 12 | Not built `*` | Would extend Q9's orchestration across all 4 tickers | Blocked — the relevance-threshold filter it needs doesn't exist yet | none |
+| 13 | Partially built | ALAB — full 4-signal health score | 1 case; deliberately scored as a current-state answer, not a historical since-purchase diff (no health-score snapshot data exists anywhere in this codebase). 2 of 3 judge criteria pass; `honest_framing` has failed across three fix attempts (prompt-only, then a keyword guard the model paraphrased around, then an LLM-classifier guard), the last of which is pending re-verification. | `test_q13.py` — precomputes the real 4-signal health score in Python before asking the agent anything, deterministically checks all 4 signals are addressed and the worst-of rollup matches, plus an LLM judge for the softer criteria (see Task 5 §2) |
 
 ### 2. Evaluation Harness
 
 Two distinct scoring shapes, matching the two distinct kinds of questions in the set — not one blanket LLM-judge rubric (Task 1 §4 explains why: a driver-identification question and a "should I sell" question aren't the same evaluation problem):
 
 - **RAG-answerable questions (1, 3, 5):** `run_eval.py`, following the `SingleTurnSample` → `EvaluationDataset` → `ragas.evaluate()` pattern from Session 6, scored with RAGAS `Faithfulness`, `LLMContextRecall`, and `FactualCorrectness` against the written reference. Question 5 additionally runs through `test_q7.py`'s keyword/exact-match path (`build_pattern`, `find_hits`, `dedupe_hits`) rather than vector retrieval — the harness itself has to route to the right retrieval mechanism per question, not just score whatever comes back.
-- **Tool-calling and hybrid questions (2, 4, 6, 7, 8, 9, 10, 11, 12, 13):** scored on tool-call accuracy, goal accuracy, and topic adherence, normalized from a LangGraph trace — same process-evaluation approach as the metal-price agent in Session 6. Questions 8, 10, and 13 additionally carry a **deterministic assertion** computed in plain Python (exact rating-count deltas for Q8, exact gain/loss math for Q10, exact sub-signal thresholds for Q13) that the LLM narrates from rather than recomputes — the harness checks the deterministic number directly, not just whether the LLM's prose sounds right.
+- **Tool-calling and hybrid questions (2, 4, 6, 7, 8, 9, 11, 12, 13):** scored on tool-call accuracy, goal accuracy, and topic adherence, normalized from a LangGraph trace — same process-evaluation approach as the metal-price agent in Session 6. Questions 8 and 13 additionally carry a **deterministic assertion** computed in plain Python (exact rating-count deltas for Q8, exact sub-signal thresholds for Q13) that the LLM narrates from rather than recomputes — the harness checks the deterministic number directly, not just whether the LLM's prose sounds right.
 
-Each question's test file (`test_q1.py` through `test_q8.py`) is independently runnable against real APIs (`python test_qN.py --ticker ... --company ...`), and `run_eval.py --question N --verbose` runs the RAGAS-scored subset end to end with full intermediate output — necessary for diagnosing *why* a score moved, not just that it did (see the Q5 fix and the retriever comparison below, both of which required reading raw responses, not just aggregate scores, to draw the right conclusion).
+**Ground-truth-first harness pattern (Q11, Q13 — refined from Q8/Q9's approach after seeing what each one missed).** Rather than judge the agent's answer purely on whether it *sounds* right, `test_q11.py` and `test_q13.py` call the same functions the live agent's own tools call (`get_fundamentals_health_score`, `fetch_next_earnings_date`) directly in Python *before the agent is ever asked anything* — so the harness has a known-correct answer to check against, not just an LLM's impression of quality. Each response is then scored two ways:
+
+- **Deterministic (hard) checks** — does the exact real value appear: the real earnings date cited verbatim, every real flagged sub-signal named, the real worst-of overall status reflected. These either pass or fail mechanically; no judgment call involved.
+- **Softer criteria (LLM judge)** — the things that can't be checked by string-matching: does the response explain the *specific number or event* behind a flagged signal instead of just repeating a status word (Q11's `goal_accuracy`); does it stay grounded in this ticker's real data instead of generic filler that would apply to any company (Q11's `topic_adherence`); does it avoid describing an intact signal as a concern or inventing a number not in the real data (Q11's `no_overclaiming`); does the worst-of rollup logic read clearly rather than like an average (Q13's `rollup_accuracy`); does it address all four sub-signals individually, not just the worst one (Q13's `signal_completeness`); and, since neither question's underlying data can support a true point-in-time comparison, does it present findings as current status honestly rather than fabricating a "since you bought it" diff it has no data to back up (Q13's `honest_framing`).
+
+This is a direct evolution of two earlier, less precise attempts: Q8's rating-delta test proved the "precompute in Python, LLM narrates" pattern works, but only tests the narration chain in isolation, not the full deployed agent. Q9's test calls the full agent but only had a deterministic *tool-coverage* check (did a filings tool fire at all), not a full known-answer check — which is exactly why its ungrounded-claim defect (Open Items) needed a second, sharper LLM-judge pass to catch in the first place. Q11/Q13 combine both: the full deployed agent, a real precomputed answer to check against, and a judge scoped to only the parts a deterministic check can't cover.
+
+Each question's test file (`test_q1.py` through `test_q13.py`) is independently runnable against real APIs (`python test_qN.py --ticker ... --company ...`), and `run_eval.py --question N --verbose` runs the RAGAS-scored subset end to end with full intermediate output — necessary for diagnosing *why* a score moved, not just that it did (see the Q5 fix and the retriever comparison below, both of which required reading raw responses, not just aggregate scores, to draw the right conclusion).
 
 ### 3. Conclusions
 
@@ -475,15 +504,19 @@ This satisfies the rubric's requirement for a second, non-retrieval improvement 
 
 - **The 4-tool agent architecture (Qdrant RAG, keyword/exact search, Tavily, Finnhub/EDGAR).** Each tool answers a genuinely different question shape — semantic similarity, exhaustive recall, live/current information, and structured numeric lookup — rather than forcing one retrieval mechanism to cover cases it's not suited for (the whole reason Q5 needed a separate keyword path in the first place). *How:* no change needed — this is the core design, already deployed and eval-tested against all 4 question shapes it's meant to cover.
 - **The Fundamentals Health Score's worst-of (not averaged) rollup.** A real product decision, not an eval-passing shortcut — a healthy revenue trend should never dilute away a genuine leadership red flag. *How:* no change; already implemented in `app/tools.py`'s `get_fundamentals_health_score()`.
-- **Deterministic math computed in Python, narrated by the LLM rather than computed by it (Q8, Q10, Q13).** An LLM asked to subtract two numbers is a place a certification eval — or a real user's actual gain/loss — shouldn't have to trust probabilistic output. *How:* no change; the pattern (`compute_trend_deltas` for Q8, equivalent logic for Q10/Q13) is now established and should be the default for every future numeric-answer question, not just these three.
+- **Deterministic math computed in Python, narrated by the LLM rather than computed by it (Q8, Q13).** An LLM asked to compute an exact number is a place a certification eval — or a real user's actual numbers — shouldn't have to trust probabilistic output. *How:* no change; the pattern (`compute_trend_deltas` for Q8, equivalent logic for Q13) is now established and should be the default for every future numeric-answer question, not just these two.
 - **Provider-side prompt caching + bounded LRU/TTL tool caches (Session 12 patterns).** Cheap, mechanically verified (cache hit/miss instrumented via `tools.cache_stats`), no real downside once traffic is more than a single demo session. *How:* no change; already applied in `app/graph.py`/`app/tools.py`.
 
 **Change:**
 
-- **Add the guardrail layer.** *What:* right now, the rule "never present a calculation as a recommendation" (Q7, Q10) is enforced only by asking the model nicely in the system prompt — there's no code that doesn't have to trust the model to comply. *Why change it:* this is the single highest-value gap for a finance-adjacent app; a system-prompt instruction is not a safety guarantee. *How:* Session 12's `@before_model`/`@after_model` middleware pattern drops into `create_react_agent` the same way the caching fixes already did — an output rail that replaces (not repairs) any unhedged buy/sell/hold language, plus a cheap input-injection rail, both directly adaptable from `01_Cat_Health_Agent_Guardrails.ipynb`.
-- **Resolve the retrieval source-preference workaround.** *What:* the parent-child retriever's comparison currently uses a hardcoded `prefer_source_suffixes` argument to rank transcript content over filing content for driver-identification questions — set by hand for one known case, not derived from the question at runtime. *Why change it:* it doesn't generalize past the one question shape it was built for. *How:* either a lightweight runtime query-intent classifier (keyword-based or a cheap LLM call) verified against a labeled question set, or a real content-based reranker that scores retrieved parents against the actual query and removes the need for a source-type rule at all — the second option is the more robust fix.
-- **Script the transcript ingestion pipeline properly.** *What:* until this week, 3 of 4 tickers' transcripts were manually saved as PDFs (introducing site-navigation noise, ad placeholders, and pagination artifacts); this session replaced them with clean text fetched directly from source. *Why change it:* the fix so far is a one-time manual correction, not a repeatable ingestion step — it won't hold up once this project tracks more than 4 tickers or refreshes quarterly. *How:* wrap the same fetch-and-extract approach used this session into a script alongside `fetch_edgar_filings.py`, so a new ticker's transcript is pulled the same reliable way its filings already are.
-- **Widen eval coverage past the current 6 of 13 built questions.** *What:* Q3 (narrative drift) is blocked on multi-quarter transcript data; Q9/Q12 need multi-signal digest orchestration; Q7/Q10/Q11 need two more Finnhub endpoints (`/quote`, `/calendar/earnings`) wired in. *Why change it:* these are real product gaps, not polish — Q7 in particular (the "should I sell" emotional-grounding question) is central to the problem statement. *How:* wire the two missing Finnhub endpoints first (unblocks 3 questions at once), then build the multi-signal orchestration Q9/Q12 both need, then revisit Q3 once a second transcript quarter is fetched per ticker.
+- **Add the guardrail layer.** *What:* right now, the rule "never present a calculation as a recommendation" (Q7) is enforced only by asking the model nicely in the system prompt — there's no code that doesn't have to trust the model to comply. *Why change it:* this is the single highest-value remaining gap for a finance-adjacent app; a system-prompt instruction is not a safety guarantee (directly demonstrated by Q9 this session — a system-prompt-only fix for a different problem, an ungrounded "no filings found" claim, measurably helped but did not resolve it; the real fix had to be a deterministic code-level check, not a stronger prompt). Three pieces, different effort each:
+  - *Input-injection rail (low effort, ~half a day):* deterministic keyword/regex check on the incoming question before it reaches the agent; short-circuits with a canned response if tripped.
+  - *PII-redaction rail (low-medium effort):* regex-based redaction (SSNs, emails, etc.) on anything logged or traced. Mechanical, no model call needed.
+  - *Output rail against unhedged buy/sell/hold directives (the real work):* a narrow, high-precision regex ban-list on imperative phrasing ("sell now," "buy immediately") is fast to build but brittle — a correctly-hedged sentence like "fundamentals don't suggest an immediate sell" can false-positive on a naive keyword match. An LLM-as-classifier pass ("does this contain unhedged financial advice?") is more robust but adds a full extra model call per turn and needs its own small eval before it can be trusted. Given time, ship the narrow regex version first and scope the classifier version as a later iteration.
+  - *Implementation approach:* rather than wiring LangGraph's `@before_model`/`@after_model` middleware (adds a framework dependency this project hasn't verified support for), extend the same plain-Python wrapper pattern already used for the Q9 fix in `app/graph.py`'s `ask()` — a deterministic pre-check on the incoming question, a deterministic (or narrow-classifier) post-check on the outgoing answer, both around the existing `graph.invoke()` calls. Same shape as an existing, proven fix, no new framework surface.
+- **Resolve the retrieval source-preference workaround — still open.** *What:* the parent-child retriever's comparison currently uses a hardcoded `prefer_source_suffixes` argument to rank transcript content over filing content for driver-identification questions — set by hand for one known case, not derived from the question at runtime. Confirmed not wired into the live agent at all (`app/tools.py`'s `search_filings` tool uses the plain retriever from `test_q1.py`, not this one) — today this only affects the Task 6 comparison script's generality, not the deployed product. *Why change it:* it doesn't generalize past the one question shape it was built for, and blocks ever promoting parent-child retrieval into the live agent with confidence. *How:* either a lightweight runtime query-intent classifier (keyword-based or a cheap LLM call, categorizing a question as transcript-preferring vs. filing-preferring) verified against a labeled question set, or a real content-based reranker that scores retrieved parents against the actual query and removes the need for a source-type category rule at all — the second option is the more robust fix. Neither is built yet; this is the actual remaining blocker before parent-child retrieval could be considered for production, not the transcript-format issue (resolved separately, see Open Items).
+- **Script the transcript ingestion pipeline properly.** *What:* transcripts are now clean, verbatim `.txt` files fetched directly from source for all 4 tickers (see Open Items). *Why change it:* the fix so far is a one-time manual correction, not a repeatable ingestion step — it won't hold up once this project tracks more than 4 tickers or refreshes quarterly. *How:* wrap the same fetch-and-extract approach used this session into a script alongside `fetch_edgar_filings.py`, so a new ticker's transcript is pulled the same reliable way its filings already are.
+- **Widen eval coverage past the current 9 of 12 built questions.** *What:* Q3 (narrative drift) is blocked on multi-quarter transcript data — only one transcript per ticker exists in `Data/` today. Q12 (portfolio-wide digest) needs Q9's orchestration logic (now built) plus an unbuilt relevance-threshold filter. *Why change it:* these are real product gaps, not polish. *How:* Q3 needs a second transcript quarter fetched per ticker before anything else is possible; Q12 is more mechanical — extend Q9's now-working digest logic across all 4 tickers and add a threshold filter so only alert-worthy items surface.
 
 ## Appendix: Scenario Walkthroughs & Data Requirements
 
@@ -505,7 +538,7 @@ This satisfies the rubric's requirement for a second, non-retrieval improvement 
 
 ### C. Minimum Onboarding Data Set
 
-See Task 3, Tables B (per-holding data) and C (portfolio-wide data) for the finalized MVP data-capture spec, and Table D for what's deferred to post-MVP.
+See Task 3, Tables B (per-holding data) and C (portfolio-wide data) for the finalized MVP data-capture spec, and Appendix F for what's deferred to post-MVP.
 
 ### D. Question-to-Data Mapping
 
@@ -538,12 +571,17 @@ None of the above continuously check a user's specific holdings against objectiv
 | Data | Role | Why deferred |
 |---|---|---|
 | X (Twitter) social sentiment | Contrast signal only — e.g. "sentiment is very negative today, but nothing in filings/news has changed" — never used as a standalone alert trigger | No free API tier as of 2026 (pay-per-use, ~$0.005/read); risk of reinforcing emotional noise if not clearly separated from fact-based signals |
+| Render Cron Job (scheduler) | Triggers the proactive monitoring loop when a new filing or news item matches a watchlist | Not built — the live app has no proactive path at all (see Task 2 §1.1); this has to exist before alerts below can fire at all |
+| Resend (email alerts) | Primary alert channel once the proactive loop above exists | Free tier (3,000/mo) comfortably covers a single user's volume — no cost to justify for MVP; not built — no Resend integration exists in the deployed app (see Task 2 §1.1) |
 | SMS alerts (Twilio) | Upgrade channel once email adoption is validated | Real per-message cost vs. free email; email covers the same job for v1 |
-| Postgres-backed memory | Durable memory across restarts | SQLite/in-memory checkpointer sufficient for MVP; migrate once persistence needs are proven |
+| Postgres-backed memory (semantic + episodic) | Durable memory across restarts: **semantic memory** (durable user facts like risk tolerance/alert sensitivity — Table C columns) and **episodic memory** (a 24–48h news-dedup cache), from Session 3's memory taxonomy; also a history of past Fundamentals Health Score computations (would unlock a true point-in-time "since you bought it" comparison for eval Q13 — see Open Items) | In-memory `MemorySaver` checkpointer sufficient for MVP (see Task 2 §2 for what this does and doesn't survive); no database exists anywhere in the deployed app (see Task 2 §1.1); migrate once persistence needs are proven. Procedural memory (a fourth Session 3 concept) has no product driver in MVP scope and isn't tracked here. |
 | MCP tool wrapper | Standardizes tool-calling interface *(Session 8: MCP)* | Optional formalism, no grading/product benefit for v1 |
-| Parent-child retrieval | Search 512-token child chunks, return the structure-aware parent (Item-based for filings, turn-based for transcripts) *(Session 7: Advanced Retrievers)* | Fixed-size chunking sufficient for MVP; positioned as the Task 6 advanced-retriever upgrade |
+| Parent-child retrieval — production promotion | Built and evaluated as the Task 6 advanced-retriever upgrade (`parent_child_retriever.py`, `compare_retrievers.py`), with real before/after evidence (Task 6 §2). Not wired into the live agent — `app/tools.py`'s `search_filings` tool still uses the plain flat-chunk retriever. | Blocked on resolving the source-preference hardcode first (see Open Items / Task 7 Next Steps) — promoting to production without it risks misranking transcript vs. filing content on question shapes it wasn't tuned for |
 | Two-tier model routing | GPT-4.1 mini for high-frequency/tool-synthesis calls, a stronger model reserved for final answer synthesis only | MVP runs GPT-4.1 mini uniformly — simpler to build and cheap enough that cost isn't the bottleneck yet; worth revisiting once real usage data shows where reasoning quality (not cost) is the limiting factor |
 | Competitive positioning / market share signal | e.g. "competitor won X deals," share-of-wallet shifts | No structured API exists — only derivable from Tavily news + LLM synthesis of transcript commentary, inherently softer/more judgment-dependent than the four deterministic Fundamentals Health Score signals (Task 2 §4) |
+| Analyst estimates/price targets | Comparison layer — "what does the street expect vs. what was said" | Not required by any of the 12 core eval questions |
+| Structured watch-conditions | User-set custom thresholds per holding, beyond the four default Fundamentals Health Score signals | Increases threshold precision further — deferred pending validation of the default thresholds against real data |
+| Sector-concentration threshold | User-editable comfort limit | Ships with a sensible default (e.g. 30%) rather than adding onboarding friction |
 
 ### G. UX Mockup Decisions (Validated Before Frontend Build)
 
@@ -579,7 +617,7 @@ Working list of known gaps and bugs surfaced during the build, tracked here so n
 
 **Known limitation, deliberately not fixed this cycle (disclosed, not hidden):** Task 6/12's parent-child retriever (`parent_child_retriever.py`) surfaces the correct source for Q1's "this quarter's gross margin change" case only after a source-type preference (prefer transcript-sourced parents over filing-sourced parents) is applied ahead of final ranking. That preference is a hardcoded argument at the call site in `compare_retrievers.py`, set because this one question's correct source was already known and diagnosed by hand — it is not derived from the question text at runtime, is not wired into any production/agent code path (none exists), and would not extend to a new question shape without a developer manually adding another hardcoded case. Confirmed this is **not** a symptom of the transcript-format issue below — the preference was still necessary even after ALAB's transcript was rebuilt fully verbatim, so cleaning up transcript quality alone does not remove the need for it. A real fix needs one of: (a) a runtime query-intent classifier (heuristic keyword-based, or an LLM classification call) verified against a labeled set of representative questions before being trusted; or (b) a content-based reranker (cross-encoder or LLM-as-judge) scoring each retrieved parent against the actual query, which wouldn't require pre-declaring a source-type-to-question-type mapping at all. Deliberately deferred to Task 7's Next Steps rather than built under this deadline, given limited remaining time and this being a comparison prototype, not a wired-in production path.
 
-**Resolved:** transcript source format inconsistency across tickers. ALAB's transcript was already clean text; AAPL/MRVL/NBIS's were manually saved as `.pdf` "print the webpage" captures of the same source site (The Motley Fool), carrying site navigation, ad placeholders (confirmed: "Advertisement" appeared 41 times in MRVL's extracted text, 32 in NBIS's), and PDF pagination artifacts landing mid-paragraph. Fixed by fetching the same Motley Fool pages directly as text (`https://www.fool.com/earnings/call-transcripts/...`) for all 4 tickers, including a full rebuild of ALAB's file — its Q&A section was discovered to be paraphrased into third person rather than verbatim quotes, a separate, previously-undocumented issue caught while fixing the PDF problem. All 4 transcripts are now clean, fully verbatim `.txt` files, validated against the real `split_transcript_into_turns` parser (13–16 speakers recognized per ticker, 24–57 real turn boundaries matched, not just eyeballed). Old PDF captures, plus two stale duplicate 10-K/10-Q PDFs found alongside MRVL's correct `.htm` filings (a second, previously-undiscovered double-ingestion bug), archived to `Data/_archive/` rather than deleted.
+**Resolved:** transcript source format inconsistency across tickers. All 4 tickers now have clean, fully verbatim `.txt` transcripts fetched directly from source (The Motley Fool), validated against the real `split_transcript_into_turns` parser (13–16 speakers recognized per ticker, 24–57 real turn boundaries matched, not just eyeballed). ALAB's file also got a full rebuild — its Q&A section was discovered to be paraphrased into third person rather than verbatim quotes, a separate, previously-undocumented issue caught during the fix. Superseded source files (plus two stale duplicate 10-K/10-Q filings found alongside MRVL's correct filings, a second, separately-discovered double-ingestion bug) archived to `Data/_archive/` rather than deleted.
 
 **Insider-activity sub-signal cannot yet distinguish a planned (10b5-1) sale from a discretionary one.** Finnhub's insider-transactions endpoint doesn't expose Rule 10b5-1 plan status. `app/tools.py`'s `get_fundamentals_health_score()` currently applies Task 2 §4's dollar/count thresholds as a conservative signal regardless of plan status, and labels every insider-activity result with that caveat rather than overstating precision. A real fix needs a source that carries plan designation — SEC's own Form 4 filings include a 10b5-1 checkbox in the structured XML that Finnhub's endpoint doesn't surface; that would mean parsing Form 4 XML directly from EDGAR instead of relying on Finnhub for this one signal. Not yet investigated.
 
@@ -590,7 +628,7 @@ Working list of known gaps and bugs surfaced during the build, tracked here so n
 - `get_fundamentals_health_score()` (Task 5's tool-result-cache-with-TTL pattern) is now cached per ticker for 15 minutes (`HEALTH_SCORE_TTL_SECONDS`) — was recomputing 4-6 live SEC/Finnhub calls on every single question, including repeat questions about the same ticker in one session. Live quotes (`get_market_data`) stay deliberately uncached — the notebook's own distinction between "5-minute-old care guidance is fine" vs. "clinic availability is not" maps directly: XBRL/8-K data is filed on a quarterly/event cadence and 15-minute staleness is a non-issue, a stale live price would not be.
 - The system prompt in `app/graph.py` (Task 6's provider-side prompt-caching pattern) now puts all static instructional text in `STABLE_SYSTEM_PROMPT` and appends the per-turn ticker/health-score block after it, rather than interpolating them inline near the top — the earlier `.format()` version changed the request's prefix on every call, which would have prevented OpenAI's own prompt cache from ever firing across turns.
 
-**New, not yet implemented:** no guardrail layer exists yet on `app/graph.py`. Session 12's guardrails notebook (`01_Cat_Health_Agent_Guardrails.ipynb`) has a directly-applicable pattern this app doesn't have: an output rail that replaces (not repairs) any draft containing authority-language it shouldn't have — there, medical diagnosis/dosage language; here, the equivalent would be unhedged buy/sell/hold directives phrased as advice rather than grounded observation (the app's own design principle in eval Q7 and Q10 — "never conflates the calculation with the recommendation" — is currently enforced only by the system prompt asking nicely, not by code that doesn't have to trust the model). Also missing: an input-side injection rail and a PII-redaction rail (both cheap, deterministic, directly copyable from the notebook) before anything reaches the model or gets logged/traced. Not implemented in this pass — flagging because it's a real gap, not a hypothetical one, and the notebook's mechanics (`@before_model`/`@after_model` middleware, `can_jump_to=["end"]`) would drop into `create_react_agent` the same way the caching fixes above did.
+**New, not yet implemented:** no guardrail layer exists yet on `app/graph.py`. Session 12's guardrails notebook (`01_Cat_Health_Agent_Guardrails.ipynb`) has a directly-applicable pattern this app doesn't have: an output rail that replaces (not repairs) any draft containing authority-language it shouldn't have — there, medical diagnosis/dosage language; here, the equivalent would be unhedged buy/sell/hold directives phrased as advice rather than grounded observation (the app's own design principle in eval Q7 — "never conflates the calculation with the recommendation" — is currently enforced only by the system prompt asking nicely, not by code that doesn't have to trust the model). Also missing: an input-side injection rail and a PII-redaction rail (both cheap, deterministic, directly copyable from the notebook) before anything reaches the model or gets logged/traced. Not implemented in this pass — flagging because it's a real gap, not a hypothetical one, and the notebook's mechanics (`@before_model`/`@after_model` middleware, `can_jump_to=["end"]`) would drop into `create_react_agent` the same way the caching fixes above did.
 
 **Resolved:** eval Q8 (analyst rating changes). Added `compute_trend_deltas()` (deterministic Python diff between the two most recent Finnhub recommendation periods) and `RATING_CHANGE_PROMPT`/`run_rating_change()` (LLM narrates the precomputed deltas, does not recompute them) as a new `--mode rating_change` path in `test_q8.py`, additive and non-breaking to the existing `--mode reaction` path Q6 uses. Verified via two real runs against MRVL: correctly reported a 1-analyst buy-rating increase (29→30, all other categories unchanged) with both period dates cited.
 
@@ -605,9 +643,8 @@ Working list of known gaps and bugs surfaced during the build, tracked here so n
 **Other known gaps, lower priority for Tuesday's submission:**
 - `fetch_leadership_events.py` was re-verified once after the email fix (`fetch_xbrl_financials.py` only) — not yet re-confirmed clean after that same fix.
 - Eval Q3 (narrative-drift across 4 earnings calls) is `not_built` — blocked on multi-quarter transcript data; only one transcript per ticker exists in `Data/` today.
-- Eval Q10 (cost-basis gain/loss) is `not_built` — blocked on a cost-basis/shares-held data source that doesn't exist anywhere in this codebase (no database, no onboarding form); needs a decision on hardcoded demo config vs. real onboarding before it can be built.
-- Eval Q11 (next-earnings-date + what-to-watch-for) has its tool-exposure gap fixed (see above) but no dedicated test harness yet.
 - Eval Q12 (portfolio-wide digest) is `not_built` — needs Q9's digest logic plus an unbuilt relevance-threshold filter.
+- Eval Q13 is `partially_built` — the `honest_framing` defect has survived three fix attempts: a prompt-only rule (insufficient), a keyword-based code guard (the model paraphrased around the exact banned phrases while preserving the same overclaim — a real lesson that literal string-matching is brittle in both directions), and now an LLM-classifier guard judging the response's meaning instead of matching phrases. The classifier version has not yet been re-verified against a real run (see the Q13 "Resolved" entry above once confirmed).
 - Eval Q13 (sub-signal-threshold assertions) is `not_built` — no dedicated test harness yet.
 - No guardrail layer on `app/graph.py` yet — see Task 7 Next Steps.
 

@@ -19,7 +19,7 @@ chat rather than typing live (typing live eats time and risks typos).
 "Hey — I'm going to walk you through Personal Portfolio Copilot, a project I
 built for the AI Engineering Certification.
 
-Here's the problem it solves. If you're a self-directed investor holding, say,
+Here's the problem it solves. If you're an everyday investor holding, say,
 15 or 20 individual stocks, you probably did real homework before buying each
 one — you had a reason. Margin expansion, a new product cycle, whatever it
 was. But once you own the stock, staying on top of *whether that reason still
@@ -125,7 +125,7 @@ whether that's routine boilerplate language or an actual new signal."
 
 "Now the evaluation side, briefly, because this is where the real work was.
 
-I built a 13-question locked eval set, hand-curated against the actual
+I built a 12-question locked eval set, hand-curated against the actual
 product behavior this app needs — not synthetically generated, because most
 of these questions need a live tool call, not just a document corpus, so a
 corpus-driven generator couldn't produce them anyway. Scored two ways:
@@ -174,7 +174,7 @@ the rule that this app should never phrase a calculation as a recommendation
 is currently enforced by the system prompt asking nicely, not by code that
 doesn't have to trust the model. That's the first thing I'd build next. After
 that, wiring in two more data endpoints to unlock a few more eval questions,
-and widening test coverage past the six questions that are fully built today."
+and widening test coverage past the 9 of 12 questions that are fully built today."
 
 ---
 

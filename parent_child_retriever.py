@@ -41,30 +41,19 @@ before writing any splitting logic:
     the longer following text, since a ToC line is one sentence and the
     real section runs pages.
 
-  - ALAB's earnings transcript (.txt): the full speaker turn, split on
-    exact speaker names extracted from the transcript's own "Call
-    participants:" header -- not a generic "Capitalized Word:" regex,
-    which would also match "Source:", "Call date:", "Published:" in the
-    same file (confirmed against Data/ALAB/transcript_Q1_2026.txt).
+  - Earnings transcripts (.txt, all 4 tickers): the full speaker turn,
+    split on exact speaker names extracted from the transcript's own
+    "Call participants:" header -- not a generic "Capitalized Word:"
+    regex, which would also match "Source:", "Call date:", "Published:"
+    in the same file (confirmed against Data/ALAB/transcript_Q1_2026.txt).
 
-  - PDF transcript fallback (.pdf, currently unused -- see below): PyMuPDFLoader
-    gives one Document per PDF page, used as one parent per page -- the
-    same page-level parent unit Session 7's own notebook uses for its
-    (also PDF) source document. NOTE, corrected from an earlier draft of
-    this docstring: the original AAPL/MRVL/NBIS transcripts were .pdf
-    files, and this fallback existed because of an assumption that PDF
-    text extraction doesn't reliably preserve speaker-turn structure.
-    That assumption was checked directly against the real PDFs and was
-    WRONG -- the actual cause was that those three PDFs were noisy
-    "save webpage as PDF" captures of the same source site as ALAB's
-    transcript (site navigation, ad placeholders, pagination artifacts),
-    not an inherent PDF-extraction limitation; real speaker-turn
-    structure was present and extractable underneath the noise in all
-    three. All 4 tracked tickers now have clean, fully verbatim .txt
-    transcripts fetched directly from source (see PRD Open Items), so
-    this PDF path is currently dead code for this project's actual data
-    -- kept only as a defensive fallback if a future ticker's transcript
-    is only available as PDF.
+  - Non-.txt fallback (currently unused): PyMuPDFLoader gives one
+    Document per page, used as one parent per page, for any future
+    source file this project ingests that isn't structured filing HTML
+    or transcript text. Dead code against this project's actual data --
+    all 4 tracked tickers have clean, fully verbatim .txt transcripts
+    fetched directly from source -- kept only as a defensive fallback
+    for a future source format.
 
 This coexists with test_q1.py's build_retriever (the MVP baseline)
 rather than replacing it -- nothing in app/tools.py or run_eval.py's

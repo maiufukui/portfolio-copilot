@@ -71,6 +71,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
@@ -140,7 +142,15 @@ called the tool that would have found it -- not calling a tool is not the same a
 finding nothing. If a question spans multiple categories (e.g. filings, media/news, and \
 analyst/market data), call the relevant tool for EACH category before concluding anything about \
 it; do not generalize a finding from one category you checked (e.g. no news found) to another \
-you never checked (e.g. no filings found)."""
+you never checked (e.g. no filings found).
+
+The Fundamentals Health Score is always a CURRENT snapshot -- there is no stored history of past \
+scores. If a user asks whether something has changed "since I bought it," "since [a date]," or \
+otherwise implies a before/after comparison, you have no data to make that comparison honestly. \
+Report the current status plainly instead, and say directly that you can only speak to the \
+current state, not a historical change -- do not phrase a current-state answer as if it were a \
+verified change over time (e.g. do not open with "since you bought this stock..." or "this has \
+changed since..." when you are only describing today's data)."""
 
 
 class AgentState(PrebuiltAgentState):
@@ -275,6 +285,70 @@ def _mentions_filings(question: str) -> bool:
     return any(kw in q for kw in _FILINGS_KEYWORDS)
 
 
+# Q13 fix (Task 5 finding): test_q13.py showed the agent phrases current
+# Fundamentals Health Score data as an explicit since-you-bought-it
+# comparison ("Therefore, since you bought Astera Labs, the underlying
+# business fundamentals appear strong...") even though there is no
+# stored history of past scores anywhere in this codebase -- a real
+# overclaim, not just imprecise wording. A prompt-only rule added to
+# STABLE_SYSTEM_PROMPT did NOT fix it -- confirmed by re-run, same
+# phrase still opened the answer, same honest_framing FAIL.
+#
+# A first code-level attempt checked the RESPONSE text for a fixed list
+# of phrases ("since you bought", etc.) -- also confirmed insufficient,
+# and instructively so: the very next re-run reworded the same overclaim
+# as "have not gotten worse... remain intact or improved," preserving
+# the identical problem while evading every literal phrase on the list.
+# A keyword list can't durably catch a paraphrase -- there's always
+# another wording. Replaced with an LLM classifier that judges the
+# RESPONSE semantically instead of string-matching it, the same
+# "narrow regex vs. LLM-classifier" tradeoff already scoped for the
+# guardrail's output rail (Task 7 Next Steps) -- this is that pattern's
+# first real implementation, not a one-off.
+#
+# Still gated by a cheap keyword check on the QUESTION first, so the
+# extra classifier call only runs on questions actually shaped to
+# invite a since-purchase comparison, not on every single turn.
+_TEMPORAL_COMPARISON_KEYWORDS = (
+    "since i bought",
+    "since you bought",
+    "since i purchased",
+    "since you purchased",
+    "since your purchase",
+    "gotten worse",
+    "gotten better",
+    "changed since",
+    "worse since",
+)
+
+_TEMPORAL_FRAMING_JUDGE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "human",
+            "Does the RESPONSE below imply a comparison of the company's fundamentals over time "
+            "-- e.g. 'has changed', 'has gotten worse/better', 'remains improved', 'has not gotten "
+            "worse', 'persists', or any other phrasing implying a before/after state -- WITHOUT "
+            "having real historical data to support that comparison? A response that plainly "
+            "describes only CURRENT status (even phrased as 'currently X' or 'as of today, X') is "
+            "NOT an overclaim, even if it separately mentions the user's purchase date as context. "
+            "Answer with exactly one word: YES or NO.\n\nRESPONSE:\n{response}",
+        )
+    ]
+)
+_temporal_framing_classifier_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+
+
+def _question_invites_temporal_comparison(question: str) -> bool:
+    q = question.lower()
+    return any(kw in q for kw in _TEMPORAL_COMPARISON_KEYWORDS)
+
+
+def _implies_unsupported_temporal_comparison(text: str) -> bool:
+    chain = _TEMPORAL_FRAMING_JUDGE_PROMPT | _temporal_framing_classifier_llm | StrOutputParser()
+    verdict = chain.invoke({"response": text}).strip().upper()
+    return verdict.startswith("YES")
+
+
 def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: bool = False) -> ChatResult:
     ticker = ticker.upper()
     health_score = get_fundamentals_health_score(ticker)  # computed once per turn, not per LLM call
@@ -319,6 +393,28 @@ def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: 
         tools_used = get_tools_used(result["messages"])
         if "search_filings" not in tools_used:
             tools_used.append("search_filings")  # forced call above, bypassed the graph's own tool node
+
+    if _question_invites_temporal_comparison(question) and _implies_unsupported_temporal_comparison(
+        result["messages"][-1].content
+    ):
+        correction = (
+            "SYSTEM CHECK: your previous answer implied a comparison since the user's purchase "
+            "date (e.g. 'since you bought this...'), but the Fundamentals Health Score has no "
+            "stored history -- it is always a current snapshot, so that comparison is not "
+            "something you can actually support. Revise your answer to remove any since-purchase "
+            "or change-over-time framing and present the same findings as CURRENT status only -- "
+            "state plainly that this reflects today's data, not a verified change since purchase. "
+            "Keep all the same facts and citations; only fix the framing."
+        )
+        result = graph.invoke(
+            {
+                "messages": [("human", correction)],
+                "ticker": ticker,
+                "health_score_text": str(health_score),
+            },
+            config=config,
+        )
+        tools_used = get_tools_used(result["messages"])
 
     if verbose:
         print_tool_trace(result["messages"])
