@@ -30,9 +30,11 @@ from langchain_community.document_loaders import (
 )
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from llm_gateway import build_embeddings
 
 load_dotenv()
 
@@ -73,7 +75,7 @@ def build_retriever(documents):
     )
     chunks = splitter.split_documents(documents)
 
-    embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
+    embedding_model = build_embeddings(model="text-embedding-3-small")
     vectorstore = QdrantVectorStore.from_documents(
         documents=chunks,
         embedding=embedding_model,

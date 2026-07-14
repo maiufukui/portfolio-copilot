@@ -1,0 +1,226 @@
+{
+  "generated_at": "2026-07-14T13:22:59.991945+00:00",
+  "questions": {
+    "1": {
+      "status": "scored",
+      "id": 1,
+      "category": "rag",
+      "scored_by": "RAGAS (faithfulness, context_recall, factual_correctness)",
+      "cases": [
+        {
+          "case": "this quarter's gross margin change",
+          "faithfulness": 1.0,
+          "context_recall": 0.0,
+          "factual_correctness(mode=f1)": 0.29
+        },
+        {
+          "case": "next quarter's gross margin guidance",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 1.0
+        },
+        {
+          "case": "this quarter's gross margin change",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.76
+        },
+        {
+          "case": "next quarter's gross margin guidance",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.5
+        },
+        {
+          "case": "this quarter's data center revenue growth",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.11
+        },
+        {
+          "case": "fiscal 2028 data center revenue growth guidance",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.78
+        },
+        {
+          "case": "this quarter's adjusted EBITDA margin change",
+          "faithfulness": 0.9333333333333333,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.38
+        },
+        {
+          "case": "next quarter's margin guidance",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.81
+        }
+      ],
+      "mean": {
+        "faithfulness": 0.9916666666666667,
+        "context_recall": 0.875,
+        "factual_correctness(mode=f1)": 0.57875
+      }
+    },
+    "2": {
+      "id": 2,
+      "status": "not_scored",
+      "reason": "test_q2.py prints an LLM relevance list (High/Medium/Low) for manual review -- no judge, no metric."
+    },
+    "3": {
+      "id": 3,
+      "status": "not_built",
+      "reason": "not built"
+    },
+    "4": {
+      "id": 4,
+      "status": "not_scored",
+      "reason": "test_q5.py prints insider-transaction records for manual review -- no judge, no metric."
+    },
+    "5": {
+      "status": "scored",
+      "id": 5,
+      "category": "rag",
+      "scored_by": "RAGAS (faithfulness, context_recall, factual_correctness)",
+      "cases": [
+        {
+          "case": "capacity, demand",
+          "faithfulness": NaN,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": NaN
+        },
+        {
+          "case": "customer concentration",
+          "faithfulness": 0.9,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.4
+        }
+      ],
+      "mean": {
+        "faithfulness": 0.9,
+        "context_recall": 1.0,
+        "factual_correctness(mode=f1)": 0.4
+      }
+    },
+    "6": {
+      "id": 6,
+      "status": "not_scored",
+      "reason": "test_q8.py --mode reaction prints an LLM analyst-reaction summary for manual review -- no judge, no metric."
+    },
+    "7": {
+      "status": "scored",
+      "id": 7,
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge only (no RAGAS metric wired in for this question yet)",
+      "cases": [
+        {
+          "case": "ALAB (8%)",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response focuses strictly on Astera Labs' specific fundamentals and recent insider activity without drifting into generic advice or emotional validation.  \ngoal_accuracy: PASS -- The response cites concrete data points such as revenue growth rates, margin stability, insider selling amounts, and analyst ratings to support its assessment.  \ntool_call_accuracy: PASS -- The agent appropriately used live news and market data tools to gather up-to-date stock price, insider activity, and news information relevant to the user's question."
+        },
+        {
+          "case": "NBIS (12%)",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response focuses strictly on the company's fundamentals, insider activity, analyst ratings, and news without validating the user's fear or offering generic reassurance.  \ngoal_accuracy: PASS -- The response cites specific data points such as insider selling amounts, analyst ratings, lack of negative 8-K filings, and absence of news explaining the drop, providing concrete evidence rather than vague statements.  \ntool_call_accuracy: PASS -- The agent appropriately used live news and market data tools to check for relevant updates and current stock information before responding."
+        },
+        {
+          "case": "MRVL (3%)",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response focuses on Marvell's specific fundamentals, insider activity, analyst ratings, and sector news without drifting into generic advice or unsubstantiated reassurance.  \ngoal_accuracy: PASS -- The response cites concrete data points such as insider selling amounts, analyst ratings, fundamentals health scores, and recent news to explicitly state that no new fundamental deterioration has occurred.  \ntool_call_accuracy: PASS -- The agent appropriately used live market data and news searches to provide an up-to-date and relevant analysis for the user's question."
+        }
+      ],
+      "mean": {}
+    },
+    "8": {
+      "id": 8,
+      "status": "not_scored",
+      "reason": "test_q8.py --mode rating_change narrates a deterministic Python delta, but nothing checks the narration against it -- no judge, no metric."
+    },
+    "9": {
+      "status": "scored",
+      "id": 9,
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "cases": [
+        {
+          "case": "ALAB",
+          "ragas_tool_call_accuracy": 0.6666666666666666,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "source_coverage: PASS -- The response explicitly addresses filings, media (noting no major news), and analyst activity with relevant details or a clear statement of no notable findings.  \ncitation_quality: PASS -- Each claim is attributed to specific filings with dates, market data with dates, and analyst coverage as of a given date, providing clear source references.  \ntool_call_accuracy: PASS -- The agent used filings data (8-K, 10-Q, 10-K), media search (noting no news), and market data including insider transactions and analyst ratings, matching the tools called.",
+          "coverage": {
+            "filings": true,
+            "media": true,
+            "analyst": true
+          }
+        }
+      ],
+      "mean": {
+        "ragas_tool_call_accuracy": 0.6666666666666666,
+        "ragas_goal_accuracy": 1.0
+      }
+    },
+    "11": {
+      "status": "scored",
+      "id": 11,
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "cases": [
+        {
+          "case": "MRVL",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "goal_accuracy: PASS -- The response specifies the leadership departure event and quantifies insider selling, directly addressing the flagged sub-signals with concrete details.  \ntopic_adherence: PASS -- The answer focuses on Marvell\u2019s actual Fundamentals Health Score data and flagged signals rather than generic commentary.  \nno_overclaiming: PASS -- The response correctly treats intact signals as stable and does not invent any unsupported numbers or concerns.",
+          "coverage": {
+            "earnings_date_cited": true,
+            "all_flagged_signals_named": true,
+            "missing_signals": []
+          }
+        },
+        {
+          "case": "NBIS",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "goal_accuracy: PASS -- The response specifies the insider activity amount ($24,413,164 sold by 4 insiders) driving the flagged sub-signal rather than just naming it.  \ntopic_adherence: PASS -- The response focuses on the actual Fundamentals Health Score data and specific flagged signals for Nebius without generic filler.  \nno_overclaiming: PASS -- The response correctly identifies intact leadership as not a concern and does not invent any unsupported numbers or issues.",
+          "coverage": {
+            "earnings_date_cited": true,
+            "all_flagged_signals_named": true,
+            "missing_signals": []
+          }
+        }
+      ],
+      "mean": {
+        "ragas_tool_call_accuracy": 1.0,
+        "ragas_goal_accuracy": 1.0
+      }
+    },
+    "12": {
+      "id": 12,
+      "status": "not_built",
+      "reason": "not built"
+    },
+    "13": {
+      "status": "scored",
+      "id": 13,
+      "category": "hybrid",
+      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "cases": [
+        {
+          "case": "ALAB",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "rollup_accuracy: PASS -- The response correctly identifies the overall status as \"at risk,\" matching the worst sub-signal (insider activity) without downplaying or exaggerating.  \nsignal_completeness: PASS -- The response addresses all four sub-signals individually: revenue growth, margin, insider activity, and leadership.  \nhonest_framing: FAIL -- The response frames the data as a current snapshot only and does not attempt to assess changes since purchase, but the user question explicitly asked about deterioration \"since I bought it,\" which the response fails to address or clarify as unsupported.",
+          "coverage": {
+            "all_signals_addressed": true,
+            "missing_signals": [],
+            "overall_status_reflected": true,
+            "real_overall": "at_risk"
+          }
+        }
+      ],
+      "mean": {
+        "ragas_tool_call_accuracy": 1.0,
+        "ragas_goal_accuracy": 1.0
+      }
+    }
+  }
+}

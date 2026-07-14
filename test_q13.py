@@ -37,9 +37,11 @@ from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from ragas.messages import ToolCall
 
 from app.graph import ask, build_graph
 from app.tools import get_fundamentals_health_score
+from eval_tool_call_accuracy import score_goal_accuracy, score_tool_call_accuracy
 
 load_dotenv()
 
@@ -75,11 +77,32 @@ WORSENED_JUDGE_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def load_q13_cases() -> list[dict]:
+def load_q13() -> dict:
     with open(DATASET_PATH) as f:
         data = json.load(f)
-    q13 = next(q for q in data["questions"] if q["id"] == 13)
-    return q13["test_cases"]
+    return next(q for q in data["questions"] if q["id"] == 13)
+
+
+# Outcome-voiced reference for RAGAS's AgentGoalAccuracyWithReference --
+# NOT eval_dataset.json's expected_behavior field, which is written as
+# design-rationale prose (it literally cites "(see PRD Open Items)", a
+# document the comparison LLM never sees) and produced a uniform, false
+# 0.00 in a real run. See test_q9.py's GOAL_REFERENCE comment for the
+# full two-bug history -- the outcome-voiced fix alone still wasn't
+# enough; debug_goal_accuracy.py's CompareOutcomeOutput.reason printout
+# showed RAGAS's fixed InferGoalOutcomePrompt never surfaces process-
+# quality judgments ("stated the CORRECT status", "presented as current
+# status rather than a comparison") in its inferred end_state, only
+# content. Kept to the single content outcome here -- rollup correctness
+# and honest current-status framing are already correctly scored by this
+# file's own custom judge's rollup_accuracy/honest_framing criteria
+# above.
+GOAL_REFERENCE = (
+    "The AI assistant reported {company}'s current status across all "
+    "four fundamentals signals -- revenue growth, margin, insider "
+    "activity, and leadership -- along with the overall worst-of "
+    "status."
+)
 
 
 def _check_coverage(response: str, health_score: dict) -> dict:
@@ -139,7 +162,48 @@ def run_case(graph, case: dict, judge_llm) -> dict:
             "response": result.answer,
         }
     )
-    print(f"\n--- Judge scoring ---\n{judgment}")
+    print(f"\n--- Judge scoring (rollup_accuracy, signal_completeness, honest_framing) ---\n{judgment}")
+
+    # Real RAGAS ToolCallAccuracy -- new for Q13 (Open Items fix), same as
+    # Q11 this file never scored tool-calling with any metric before.
+    # Required set kept to the two calls Q13's question actually demands
+    # data for beyond what get_fundamentals_health_score() already
+    # computes directly in Python (revenue/margin/leadership are NOT
+    # agent tool calls at all -- see app/graph.py's ask()): get_market_data
+    # for insider-activity numbers, and a filings check, since "insider
+    # activity or leadership" is exactly the shape the FilingsRelevance
+    # classifier (Open Items) routes to a real filings search. search_live_news
+    # is deliberately left out of the reference -- real runs show the agent
+    # also calls it, but nothing in Q13's question requires media search
+    # specifically, and a 2-item reference lets that extra real call be
+    # exactly that (extra), not penalized (see
+    # eval_tool_call_accuracy.py's module docstring on subsequence
+    # tolerance for calls outside the reference).
+    acceptable_tool_sets = [
+        [
+            ToolCall(name="get_market_data", args={"ticker": ticker}),
+            ToolCall(name="search_filings", args={"ticker": ticker}),
+        ],
+        [
+            ToolCall(name="get_market_data", args={"ticker": ticker}),
+            ToolCall(name="search_filings_exact", args={"ticker": ticker}),
+        ],
+    ]
+    ragas_result = score_tool_call_accuracy(question, result.tool_calls, acceptable_tool_sets)
+    print(
+        f"\n--- RAGAS ToolCallAccuracy (real metric class) ---\n"
+        f"score: {ragas_result.score:.2f} (best-matching reference order: {ragas_result.best_reference})\n"
+        f"predicted sequence: {[c['name'] for c in result.tool_calls]}"
+    )
+
+    # Real RAGAS AgentGoalAccuracyWithReference -- new for Q13 (Open Items
+    # fix), same gap as Q9/Q11: goal_accuracy was only ever scored by this
+    # file's own PASS/FAIL judge prompt. Uses GOAL_REFERENCE (outcome-
+    # voiced), not expected_behavior (rubric-voiced) -- see comment above.
+    goal_score = score_goal_accuracy(
+        question, result.tool_calls, result.answer, GOAL_REFERENCE.format(company=company)
+    )
+    print(f"\n--- RAGAS AgentGoalAccuracyWithReference (real metric class) ---\nscore: {goal_score:.2f}")
 
     return {
         "ticker": ticker,
@@ -147,6 +211,8 @@ def run_case(graph, case: dict, judge_llm) -> dict:
         "coverage": coverage,
         "response": result.answer,
         "judgment": judgment,
+        "ragas_tool_call_accuracy": ragas_result.score,
+        "ragas_goal_accuracy": goal_score,
     }
 
 
@@ -160,10 +226,12 @@ def main():
     if not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("OPENAI_API_KEY not set. Copy .env.example to .env and fill it in.")
 
+    q13 = load_q13()
+
     if args.ticker:
         cases = [{"ticker": args.ticker, "company": args.company or args.ticker, "date_purchased": args.date_purchased}]
     else:
-        cases = load_q13_cases()
+        cases = q13["test_cases"]
 
     graph = build_graph()
     judge_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
@@ -178,7 +246,11 @@ def main():
         if not r["coverage"]["overall_status_reflected"]:
             flags.append(f"OVERALL ('{r['coverage']['real_overall']}') NOT REFLECTED")
         flag_str = f"  <-- {'; '.join(flags)}" if flags else ""
-        print(f"{r['ticker']}: tools={r['tools_used']}{flag_str}")
+        print(
+            f"{r['ticker']}: tools={r['tools_used']}{flag_str}  "
+            f"ragas_tool_call_accuracy={r['ragas_tool_call_accuracy']:.2f}  "
+            f"ragas_goal_accuracy={r['ragas_goal_accuracy']:.2f}"
+        )
 
 
 if __name__ == "__main__":

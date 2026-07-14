@@ -39,9 +39,11 @@ from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from ragas.messages import ToolCall
 
 from app.graph import ask, build_graph
 from app.tools import fetch_next_earnings_date, get_fundamentals_health_score
+from eval_tool_call_accuracy import score_goal_accuracy, score_tool_call_accuracy
 
 load_dotenv()
 
@@ -76,11 +78,25 @@ WATCH_JUDGE_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def load_q11_cases() -> list[dict]:
+def load_q11() -> dict:
     with open(DATASET_PATH) as f:
         data = json.load(f)
-    q11 = next(q for q in data["questions"] if q["id"] == 11)
-    return q11["test_cases"]
+    return next(q for q in data["questions"] if q["id"] == 11)
+
+
+# Outcome-voiced reference for RAGAS's AgentGoalAccuracyWithReference --
+# NOT eval_dataset.json's expected_behavior field. See test_q9.py's
+# GOAL_REFERENCE comment for the full two-bug history (rubric-voiced
+# prose, then a still-too-checklist-shaped outcome statement) confirmed
+# via debug_goal_accuracy.py's CompareOutcomeOutput.reason printout.
+# Kept to the single content outcome here too -- "citing the specific
+# number or event behind each flagged signal" is process quality, not
+# outcome content, and is already correctly scored by this file's own
+# custom judge's goal_accuracy criterion above.
+GOAL_REFERENCE = (
+    "The AI assistant reported {company}'s next earnings date and named "
+    "the fundamentals sub-signals currently at Monitor or At Risk."
+)
 
 
 def get_ground_truth(ticker: str) -> dict:
@@ -167,7 +183,34 @@ def run_case(graph, case: dict, judge_llm) -> dict:
             "response": result.answer,
         }
     )
-    print(f"\n--- Judge scoring ---\n{judgment}")
+    print(f"\n--- Judge scoring (goal_accuracy, topic_adherence, no_overclaiming) ---\n{judgment}")
+
+    # Real RAGAS ToolCallAccuracy -- new for Q11 (Open Items fix). This
+    # file never scored tool-calling behavior with any metric before,
+    # real or custom -- only printed result.tools_used for visibility.
+    # The next-earnings date is surfaced by get_market_data
+    # (fetch_next_earnings_date is wired into it -- see PRD Task 5 Table
+    # E), so that's the one deterministic required call; a single-item
+    # reference is maximally tolerant of any other real calls the agent
+    # also makes (see eval_tool_call_accuracy.py -- is_sequence_aligned
+    # returns True as soon as the one required call appears anywhere in
+    # the predicted sequence).
+    acceptable_tool_sets = [[ToolCall(name="get_market_data", args={"ticker": ticker})]]
+    ragas_result = score_tool_call_accuracy(question, result.tool_calls, acceptable_tool_sets)
+    print(
+        f"\n--- RAGAS ToolCallAccuracy (real metric class) ---\n"
+        f"score: {ragas_result.score:.2f}\n"
+        f"predicted sequence: {[c['name'] for c in result.tool_calls]}"
+    )
+
+    # Real RAGAS AgentGoalAccuracyWithReference -- new for Q11 (Open Items
+    # fix), same gap as Q9/Q13: goal_accuracy was only ever scored by this
+    # file's own PASS/FAIL judge prompt. Uses GOAL_REFERENCE (outcome-
+    # voiced), not expected_behavior (rubric-voiced) -- see comment above.
+    goal_score = score_goal_accuracy(
+        question, result.tool_calls, result.answer, GOAL_REFERENCE.format(company=company)
+    )
+    print(f"\n--- RAGAS AgentGoalAccuracyWithReference (real metric class) ---\nscore: {goal_score:.2f}")
 
     return {
         "ticker": ticker,
@@ -175,6 +218,8 @@ def run_case(graph, case: dict, judge_llm) -> dict:
         "coverage": coverage,
         "response": result.answer,
         "judgment": judgment,
+        "ragas_tool_call_accuracy": ragas_result.score,
+        "ragas_goal_accuracy": goal_score,
     }
 
 
@@ -187,10 +232,12 @@ def main():
     if not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("OPENAI_API_KEY not set. Copy .env.example to .env and fill it in.")
 
+    q11 = load_q11()
+
     if args.ticker:
         cases = [{"ticker": args.ticker, "company": args.company or args.ticker}]
     else:
-        cases = load_q11_cases()
+        cases = q11["test_cases"]
 
     graph = build_graph()
     judge_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
@@ -205,7 +252,11 @@ def main():
         if r["coverage"]["missing_signals"]:
             flags.append(f"MISSING SIGNALS: {r['coverage']['missing_signals']}")
         flag_str = f"  <-- {'; '.join(flags)}" if flags else ""
-        print(f"{r['ticker']}: tools={r['tools_used']}{flag_str}")
+        print(
+            f"{r['ticker']}: tools={r['tools_used']}{flag_str}  "
+            f"ragas_tool_call_accuracy={r['ragas_tool_call_accuracy']:.2f}  "
+            f"ragas_goal_accuracy={r['ragas_goal_accuracy']:.2f}"
+        )
 
 
 if __name__ == "__main__":

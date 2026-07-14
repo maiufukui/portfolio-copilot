@@ -36,8 +36,10 @@ from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from ragas.messages import ToolCall
 
 from app.graph import ask, build_graph
+from eval_tool_call_accuracy import score_goal_accuracy, score_tool_call_accuracy
 
 load_dotenv()
 
@@ -83,11 +85,39 @@ DIGEST_JUDGE_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def load_q9_cases() -> list[dict]:
+def load_q9() -> dict:
     with open(DATASET_PATH) as f:
         data = json.load(f)
-    q9 = next(q for q in data["questions"] if q["id"] == 9)
-    return q9["test_cases"]
+    return next(q for q in data["questions"] if q["id"] == 9)
+
+
+# Outcome-voiced reference for RAGAS's AgentGoalAccuracyWithReference --
+# NOT eval_dataset.json's expected_behavior field. A real run confirmed
+# expected_behavior (written as rubric/spec prose) produces a uniform,
+# false 0.00 against this metric's CompareOutcomePrompt.
+#
+# SECOND real bug found after that fix, via debug_goal_accuracy.py
+# printing the CompareOutcomeOutput.reason field RAGAS normally discards:
+# even this outcome-voiced version still scored a uniform 0.00, with the
+# SAME reasoning from both gpt-4.1-mini and gpt-4.1 (ruling out judge-
+# model weakness) -- CompareOutcomePrompt correctly, by its own literal
+# logic, called the outcomes "different" because the reference named a
+# QUALITY criterion ("with every concrete claim cited to a specific
+# source and date") that RAGAS's own fixed InferGoalOutcomePrompt never
+# surfaces in its inferred end_state -- that prompt's job is a content
+# summary of what happened, not an assessment of citation completeness.
+# RAGAS's own single few-shot example for this metric is a simple,
+# ONE-part outcome ("book a table") -- a multi-part reference bundling
+# content + process quality is structurally the wrong shape for this
+# metric, not a wording problem this metric can be tuned around. Fixed
+# by keeping GOAL_REFERENCE to the single content outcome and leaving
+# citation quality to the custom judge's own citation_quality criterion
+# (already implemented, already passing above) -- each criterion scored
+# by the mechanism actually able to check it.
+GOAL_REFERENCE = (
+    "The AI assistant produced a weekly digest for {company} covering "
+    "filings, media coverage, and analyst activity."
+)
 
 
 def _category_coverage(tools_used: list[str]) -> dict[str, bool]:
@@ -129,7 +159,44 @@ def run_case(graph, case: dict, judge_llm) -> dict:
             "response": result.answer,
         }
     )
-    print(f"\n--- Judge scoring ---\n{judgment}")
+    print(f"\n--- Judge scoring (custom PASS/FAIL prompt -- source_coverage, citation_quality) ---\n{judgment}")
+
+    # Real RAGAS ToolCallAccuracy (Open Items fix -- was previously scored
+    # only by this file's own PASS/FAIL "tool_call_accuracy" line above,
+    # a hand-written judge guess, not the actual metric class). ticker is
+    # the only deterministic arg checked (see eval_tool_call_accuracy.py
+    # module docstring for why free-text query/keywords args are left out
+    # of the reference, and why every acceptable filings-tool name is
+    # tried).
+    t = case["ticker"]
+    acceptable_tool_sets = [
+        [
+            ToolCall(name="search_filings", args={"ticker": t}),
+            ToolCall(name="search_live_news", args={}),
+            ToolCall(name="get_market_data", args={"ticker": t}),
+        ],
+        [
+            ToolCall(name="search_filings_exact", args={"ticker": t}),
+            ToolCall(name="search_live_news", args={}),
+            ToolCall(name="get_market_data", args={"ticker": t}),
+        ],
+    ]
+    ragas_result = score_tool_call_accuracy(question, result.tool_calls, acceptable_tool_sets)
+    print(
+        f"\n--- RAGAS ToolCallAccuracy (real metric class) ---\n"
+        f"score: {ragas_result.score:.2f} (best-matching reference order: {ragas_result.best_reference})\n"
+        f"predicted sequence: {[c['name'] for c in result.tool_calls]}"
+    )
+
+    # Real RAGAS AgentGoalAccuracyWithReference (Open Items fix -- same gap
+    # as tool_call_accuracy above: goal_accuracy was only ever scored by
+    # this file's own PASS/FAIL judge prompt, never RAGAS's real metric
+    # class). Uses GOAL_REFERENCE (outcome-voiced), not expected_behavior
+    # (rubric-voiced) -- see GOAL_REFERENCE's docstring comment above.
+    goal_score = score_goal_accuracy(
+        question, result.tool_calls, result.answer, GOAL_REFERENCE.format(company=case["company"])
+    )
+    print(f"\n--- RAGAS AgentGoalAccuracyWithReference (real metric class) ---\nscore: {goal_score:.2f}")
 
     return {
         "ticker": case["ticker"],
@@ -137,6 +204,8 @@ def run_case(graph, case: dict, judge_llm) -> dict:
         "coverage": coverage,
         "response": result.answer,
         "judgment": judgment,
+        "ragas_tool_call_accuracy": ragas_result.score,
+        "ragas_goal_accuracy": goal_score,
     }
 
 
@@ -149,10 +218,12 @@ def main():
     if not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("OPENAI_API_KEY not set. Copy .env.example to .env and fill it in.")
 
+    q9 = load_q9()
+
     if args.ticker:
         cases = [{"ticker": args.ticker, "company": args.company or args.ticker}]
     else:
-        cases = load_q9_cases()
+        cases = q9["test_cases"]
 
     graph = build_graph()
     judge_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
@@ -163,7 +234,11 @@ def main():
     for r in results:
         missing = [k for k, v in r["coverage"].items() if not v]
         flag = "" if not missing else f"  <-- MISSING: {missing}"
-        print(f"{r['ticker']}: tools={r['tools_used']}{flag}")
+        print(
+            f"{r['ticker']}: tools={r['tools_used']}{flag}  "
+            f"ragas_tool_call_accuracy={r['ragas_tool_call_accuracy']:.2f}  "
+            f"ragas_goal_accuracy={r['ragas_goal_accuracy']:.2f}"
+        )
 
 
 if __name__ == "__main__":

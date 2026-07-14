@@ -71,12 +71,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState as PrebuiltAgentState
+from pydantic import BaseModel, Field
+
+from llm_gateway import build_chat_llm
 
 from app.tools import TOOL_BELT, get_fundamentals_health_score, search_filings
 
@@ -144,13 +144,23 @@ analyst/market data), call the relevant tool for EACH category before concluding
 it; do not generalize a finding from one category you checked (e.g. no news found) to another \
 you never checked (e.g. no filings found).
 
-The Fundamentals Health Score is always a CURRENT snapshot -- there is no stored history of past \
-scores. If a user asks whether something has changed "since I bought it," "since [a date]," or \
-otherwise implies a before/after comparison, you have no data to make that comparison honestly. \
-Report the current status plainly instead, and say directly that you can only speak to the \
-current state, not a historical change -- do not phrase a current-state answer as if it were a \
-verified change over time (e.g. do not open with "since you bought this stock..." or "this has \
-changed since..." when you are only describing today's data)."""
+A deterministic Current Fundamentals Health Score block is always shown to the user immediately \
+before your answer -- it is rendered directly from real data, not written by you. Do not restate, \
+repeat, or re-characterize that block's overall verdict or any signal's status in your own words, \
+and never phrase your answer as a comparison over time ("since you bought this stock...", "this \
+has changed since...", "remains improved") -- there is no stored history of past scores, so any \
+such comparison would be unsupported. Your job is narrower: add supporting detail underneath that \
+block -- the specific numbers, filings, news, and citations behind each signal -- without ever \
+independently declaring whether something has gotten better or worse.
+
+If a signal in that block is marked "insufficient data" (e.g. a 20-F filer with no quarterly XBRL \
+on file), you may still report real, tool-sourced numbers relevant to that same dimension -- e.g. \
+a growth or margin figure the company disclosed on an earnings call -- but you must clearly label \
+that figure as self-reported / from a different source (transcript, press release), not as the \
+structured signal itself, and state plainly that it does not resolve the "insufficient data" \
+status. Never present such a figure under a header that mirrors the signal's own name (e.g. \
+"Revenue Growth", "Margin") without that caveat -- a reader should never come away thinking a \
+precise, confidently-stated number fills a gap the app has explicitly flagged as unverified."""
 
 
 class AgentState(PrebuiltAgentState):
@@ -196,7 +206,7 @@ def build_system_prompt(state: AgentState) -> list:
 
 
 def build_graph():
-    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+    llm = build_chat_llm(model="gpt-4.1-mini", temperature=0)
     checkpointer = MemorySaver()  # thread-scoped short-term memory (Session 3)
     return create_react_agent(
         llm,
@@ -257,9 +267,30 @@ def get_tools_used(messages) -> list[str]:
     return seen
 
 
+def get_tool_calls(messages) -> list[dict]:
+    """Every individual tool call in real order, as {"name": str, "args":
+    dict} -- NOT deduped (unlike get_tools_used above), because RAGAS's
+    ToolCallAccuracy scores the actual call sequence, repeats included.
+
+    Added for the Q9/Q11/Q13 ToolCallAccuracy swap (Open Items, Task 5):
+    the eval test files need the real tool_calls (with args) off each
+    AIMessage to build a Ragas message trace, the same extraction Session
+    6's notebook does from LangChain AIMessage.tool_calls
+    (01_Metal_Price_Agent_Evaluation_Ragas_LangGraph.ipynb's
+    to_ragas_messages). get_tools_used() alone (plain deduped names) isn't
+    enough for that -- ToolCallAccuracy needs real args to score against.
+    """
+    calls: list[dict] = []
+    for msg in messages:
+        for call in getattr(msg, "tool_calls", None) or []:
+            calls.append({"name": call["name"], "args": dict(call.get("args") or {})})
+    return calls
+
+
 class ChatResult(NamedTuple):
     answer: str
     tools_used: list[str]
+    tool_calls: list[dict]
 
 
 # Q9 fix (Task 5 finding): test_q9.py showed the agent reliably
@@ -272,81 +303,264 @@ class ChatResult(NamedTuple):
 # still FAIL on tool_call_accuracy with the exact same missed-filings
 # pattern. Rather than keep tuning prompt wording and hoping it
 # eventually outweighs the model's own generalization tendency, this
-# forces the check deterministically for questions that name filings
-# explicitly -- same deterministic-check-then-LLM-narrates pattern this
-# codebase already uses for the Fundamentals Health Score itself, not
-# another chance for the model to skip it again.
-_FILINGS_KEYWORDS = {"filing", "filings", "filed", "10-k", "10-q", "8-k", "disclosure", "disclosures"}
+# forces the check deterministically off the actual tool-call TRACE --
+# same deterministic-check-then-LLM-narrates pattern this codebase
+# already uses for the Fundamentals Health Score itself.
+#
+# The trace check itself (did a filings tool actually get called) is
+# real ground truth, not a keyword match, and stays as-is. What
+# originally decided whether that check even applied -- a fixed keyword
+# list on the QUESTION (_mentions_filings, checking for "filing",
+# "10-k", "8-k", etc.) -- had the same brittleness later found and
+# removed from the Q13 fix: a question that needs a filings check but
+# doesn't use any of those exact words (e.g. "did they disclose
+# anything about customer concentration recently?") would silently skip
+# it. Replaced with a small structured-output classifier, the same
+# pattern Session 12's guardrails notebook uses for its topic guard
+# (TopicVerdict/check_topic in 01_Cat_Health_Agent_Guardrails.ipynb) --
+# a Pydantic-typed verdict instead of prose, so the result is something
+# code can branch on, not another string to parse.
 _FILINGS_TOOLS = {"search_filings", "search_filings_exact"}
 
 
-def _mentions_filings(question: str) -> bool:
-    q = question.lower()
-    return any(kw in q for kw in _FILINGS_KEYWORDS)
+class FilingsRelevance(BaseModel):
+    """Classification of whether a question needs a real SEC filings check
+    to answer completely -- the model-based replacement for a fixed
+    keyword list (see comment above)."""
+
+    needs_filings_check: bool = Field(
+        description="True if answering this question completely requires checking real SEC filings "
+        "(10-K/10-Q/8-K) -- e.g. it asks about disclosures, filed events, leadership changes, material "
+        "events, or anything else that would only be confirmed by an actual filing, not just news or "
+        "market data."
+    )
+    reason: str = Field(description="One short sentence explaining the classification.")
 
 
-# Q13 fix (Task 5 finding): test_q13.py showed the agent phrases current
-# Fundamentals Health Score data as an explicit since-you-bought-it
-# comparison ("Therefore, since you bought Astera Labs, the underlying
-# business fundamentals appear strong...") even though there is no
-# stored history of past scores anywhere in this codebase -- a real
-# overclaim, not just imprecise wording. A prompt-only rule added to
-# STABLE_SYSTEM_PROMPT did NOT fix it -- confirmed by re-run, same
-# phrase still opened the answer, same honest_framing FAIL.
-#
-# A first code-level attempt checked the RESPONSE text for a fixed list
-# of phrases ("since you bought", etc.) -- also confirmed insufficient,
-# and instructively so: the very next re-run reworded the same overclaim
-# as "have not gotten worse... remain intact or improved," preserving
-# the identical problem while evading every literal phrase on the list.
-# A keyword list can't durably catch a paraphrase -- there's always
-# another wording. Replaced with an LLM classifier that judges the
-# RESPONSE semantically instead of string-matching it, the same
-# "narrow regex vs. LLM-classifier" tradeoff already scoped for the
-# guardrail's output rail (Task 7 Next Steps) -- this is that pattern's
-# first real implementation, not a one-off.
-#
-# Still gated by a cheap keyword check on the QUESTION first, so the
-# extra classifier call only runs on questions actually shaped to
-# invite a since-purchase comparison, not on every single turn.
-_TEMPORAL_COMPARISON_KEYWORDS = (
-    "since i bought",
-    "since you bought",
-    "since i purchased",
-    "since you purchased",
-    "since your purchase",
-    "gotten worse",
-    "gotten better",
-    "changed since",
-    "worse since",
+_FILINGS_RELEVANCE_PROMPT = (
+    "You are a routing guard for a portfolio research assistant with four tools: a filings search, "
+    "a live news search, and a market-data tool. Classify whether the user's question requires "
+    "actually checking SEC filings (10-K/10-Q/8-K) to answer completely -- not just live news or "
+    "market data. Questions about disclosures, filed events, leadership changes, or material events "
+    "need a filings check even if they never say the word 'filing'."
+)
+_filings_relevance_llm = build_chat_llm(model="gpt-4.1-mini", temperature=0).with_structured_output(
+    FilingsRelevance
 )
 
-_TEMPORAL_FRAMING_JUDGE_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "human",
-            "Does the RESPONSE below imply a comparison of the company's fundamentals over time "
-            "-- e.g. 'has changed', 'has gotten worse/better', 'remains improved', 'has not gotten "
-            "worse', 'persists', or any other phrasing implying a before/after state -- WITHOUT "
-            "having real historical data to support that comparison? A response that plainly "
-            "describes only CURRENT status (even phrased as 'currently X' or 'as of today, X') is "
-            "NOT an overclaim, even if it separately mentions the user's purchase date as context. "
-            "Answer with exactly one word: YES or NO.\n\nRESPONSE:\n{response}",
-        )
+
+def _question_needs_filings_check(question: str) -> bool:
+    verdict = _filings_relevance_llm.invoke(
+        [("system", _FILINGS_RELEVANCE_PROMPT), ("human", question)]
+    )
+    return verdict.needs_filings_check
+
+
+# Q13 fix (Task 5 finding), full history in the PRD's Open Items --
+# summarized here because it explains why this function exists in this
+# shape. Four attempts tried to detect-and-correct an LLM-composed
+# since-you-bought-it comparison after the fact: a prompt-only rule
+# (didn't fix it), a keyword list checking the RESPONSE for banned
+# phrases (evaded by paraphrase -- "have not gotten worse... remain
+# intact or improved"), that same check gated by a keyword list on the
+# QUESTION instead (same brittleness, one level removed), and finally an
+# ungated LLM classifier that correctly detected the overclaim but whose
+# "please revise" correction turn kept reproducing the same underlying
+# problem in new words, and whose later append-only-a-disclaimer version
+# left an explicit comparison claim sitting uncontradicted earlier in
+# the same message.
+#
+# Every attempt shared the same flaw: they let the model freely compose
+# an answer to a question that invites a since-purchase comparison, then
+# tried to police what it said afterward. This function removes that
+# decision from the model entirely, following the same principle this
+# codebase already uses for Q8 (`compute_trend_deltas` computes the
+# real numbers in Python; the LLM only narrates them, never computes
+# them) -- Task 7's Next Steps names this as the intended pattern for
+# Q13 too. get_fundamentals_health_score() already returns the exact,
+# deterministic status of every signal. Rendering that directly as a
+# fixed block -- never delegated to the model -- makes a temporal-
+# comparison claim structurally impossible in the one place it kept
+# appearing, rather than probabilistically less likely. The model is
+# told (STABLE_SYSTEM_PROMPT above) that this block always precedes its
+# answer, and its job is narrowed to supporting detail only, never to
+# characterizing the verdict itself.
+def _render_current_status_block(ticker: str, health_score: dict) -> str:
+    order = {"intact": 0, "monitor": 1, "at_risk": 2, "insufficient_data": -1}
+    overall = health_score.get("overall", "insufficient_data")
+    lines = [
+        f"**Current Fundamentals Health Score for {ticker} -- today's snapshot only, "
+        "not a comparison to any prior date:**",
+        f"- Overall: {overall.replace('_', ' ').upper()}",
     ]
+    for name, sig in health_score.get("signals", {}).items():
+        status = sig.get("status", "insufficient_data").replace("_", " ")
+        label = name.replace("_", " ").title()
+        detail = sig.get("reason")
+        if not detail and name == "insider_activity" and "total_sell_value_30d" in sig:
+            detail = (
+                f"${sig['total_sell_value_30d']:,} sold across "
+                f"{sig.get('distinct_sellers_30d', 0)} insider(s) in the last 30 days"
+            )
+        if not detail and name == "leadership" and sig.get("departures"):
+            detail = f"{len(sig['departures'])} departure-related 8-K(s) in the last 90 days"
+        lines.append(f"- {label}: {status}" + (f" -- {detail}" if detail else ""))
+    return "\n".join(lines)
+
+
+# Q13 fix, 6th attempt: a real re-run of the deterministic-block design
+# above (already proven correct in isolation -- it cannot itself contain
+# a comparison claim) still FAILed honest_framing. The status block was
+# fine; the model's own free-text answer, right underneath it, opened
+# with "Since you bought Astera Labs (ALAB), here is what the objective
+# data... show" -- almost the exact phrase STABLE_SYSTEM_PROMPT names as
+# banned, immediately after telling the model a status block already
+# precedes its answer. Not a subtle miss -- a direct instruction
+# violation.
+#
+# Best-supported explanation: the model is mirroring the QUESTION, not
+# ignoring the rule. The question literally contains "...since I bought
+# it..."; opening a response by echoing the question's own framing is a
+# generic, strong conversational habit that a rule buried in a long
+# system prompt doesn't reliably beat. Suppressing the model's response
+# is fighting the wrong end of the problem -- the fix is to stop the
+# model from ever seeing that literal phrasing at the point it composes
+# the free-text narrative, not to add yet another instruction telling it
+# not to react to something it can still see.
+#
+# This is the same retrieve-then-synthesize discipline this app's RAG
+# design already runs on (Task 3 SS3: retrieval and synthesis are
+# separate steps), applied one step further in: the supporting-detail
+# narrative is now composed from the raw TOOL OUTPUTS this turn already
+# gathered, in a standalone prompt that never includes the user's
+# original question text at all -- there is nothing for it to mirror.
+# Routing to this path uses a structured classifier on the QUESTION
+# (TemporalComparisonQuestion, same shape as Q9's FilingsRelevance), not
+# a keyword list -- scoped narrowly so Q7/Q9/Q11 and every other
+# question shape keep getting the normal agent's own tailored answer,
+# unchanged and unregressed.
+class TemporalComparisonQuestion(BaseModel):
+    """Classification of whether a question invites a since-purchase /
+    change-over-time comparison this app has no historical data to
+    support."""
+
+    invites_temporal_comparison: bool = Field(
+        description="True if the question asks whether something has changed, gotten worse/better, "
+        "or otherwise implies a before/after comparison against a PRIOR reference point (e.g. 'since "
+        "I bought it', 'has this changed', 'is this still a good hold'). False if the question only "
+        "asks what's notable/current within a recency window (e.g. 'this week', 'lately') without "
+        "comparing to a past state -- a time window is not the same as a before/after comparison."
+    )
+
+
+# Real bug, found via a real test_q9.py run: this classifier fired True on
+# Q9's "Summarize everything notable about {company} this week -- filings,
+# media, and analyst activity" question, misrouting it into the Q13-only
+# signal-facts narrative composer below (confirmed by matching the observed
+# response's exact structure -- one paragraph per health-score signal,
+# "(structured data)" citations -- to _SUPPORTING_DETAIL_PROMPT's literal
+# output shape). Root cause: the model over-generalized "this week" (a
+# recency WINDOW) into "temporal" -> "comparison", even though Q9 never
+# asks whether anything changed. Fixed with explicit few-shot examples
+# below, drawing the window-vs-comparison line directly instead of relying
+# on the one-line instruction alone.
+_TEMPORAL_QUESTION_PROMPT = """Classify whether this question about a stock holding asks for a \
+comparison over time (since purchase, since a date, whether something has changed) rather than \
+asking only about current status or what's notable within a recency window.
+
+A question mentioning a TIME WINDOW ("this week", "recently", "lately") is NOT automatically a \
+comparison question -- it's asking what's new/notable within that window, not whether anything has \
+changed relative to a past state. Only classify True if the question explicitly or implicitly asks \
+to compare against a PRIOR reference point (a purchase date, "has this changed", "gotten worse/\
+better", "is this still worth holding").
+
+Examples:
+- "Summarize everything notable about Astera Labs this week -- filings, media, and analyst \
+activity." -> False (asks what's notable within a window, not a comparison against the past)
+- "Has anything about Astera Labs's underlying business gotten worse since I bought it -- revenue, \
+margins, insider activity, or leadership?" -> True (explicit since-purchase comparison)
+- "When does Marvell report next, and what should I watch for based on its current Fundamentals \
+Health Score?" -> False (asks about current status and what to watch, not whether anything changed)
+- "Is Nebius still a good hold given what's happened since Q1?" -> True (implies a before/after \
+comparison)"""
+_temporal_question_llm = build_chat_llm(model="gpt-4.1-mini", temperature=0).with_structured_output(
+    TemporalComparisonQuestion
 )
-_temporal_framing_classifier_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
 
 def _question_invites_temporal_comparison(question: str) -> bool:
-    q = question.lower()
-    return any(kw in q for kw in _TEMPORAL_COMPARISON_KEYWORDS)
+    verdict = _temporal_question_llm.invoke(
+        [("system", _TEMPORAL_QUESTION_PROMPT), ("human", question)]
+    )
+    return verdict.invites_temporal_comparison
 
 
-def _implies_unsupported_temporal_comparison(text: str) -> bool:
-    chain = _TEMPORAL_FRAMING_JUDGE_PROMPT | _temporal_framing_classifier_llm | StrOutputParser()
-    verdict = chain.invoke({"response": text}).strip().upper()
-    return verdict.startswith("YES")
+def _extract_tool_outputs(messages) -> str:
+    """Raw tool results from this turn only -- what the fact-grounded
+    narrative below is built from, instead of the model's own prior
+    answer (which is exactly what kept mirroring the question)."""
+    parts = [
+        f"[{getattr(msg, 'name', 'unknown_tool')}]\n{msg.content}"
+        for msg in messages
+        if getattr(msg, "type", None) == "tool"
+    ]
+    return "\n\n".join(parts) if parts else "(no tool results this turn)"
+
+
+def _render_signal_facts(health_score: dict) -> str:
+    """Supporting numeric detail for every signal that has real computed
+    data -- NOT the signal's status/verdict, which the narrative
+    composer is banned from repeating (see _SUPPORTING_DETAIL_PROMPT).
+
+    Exists because a real test_q13.py run against ALAB caught a gap:
+    two of the four signals (revenue_growth, margin) are computed
+    directly from XBRL data inside get_fundamentals_health_score() and
+    never go through an agent tool call, so _extract_tool_outputs()
+    alone has nothing to say about them. The narrative composer wrote
+    about insider activity and leadership (both tool-sourced that turn)
+    but skipped margin entirely -- not a flaky judge result, a real gap
+    in what data the composer had access to. This function closes it by
+    handing over each signal's raw supporting numbers regardless of
+    which source (tool call or structured XBRL fetch) produced them.
+    """
+    lines = []
+    for name, sig in health_score.get("signals", {}).items():
+        if sig.get("status") == "insufficient_data":
+            continue
+        facts = {k: v for k, v in sig.items() if k not in ("status", "reason")}
+        if not facts:
+            continue
+        label = name.replace("_", " ").title()
+        lines.append(f"[{label} -- structured data, not a tool result]\n{facts}")
+    return "\n\n".join(lines) if lines else "(no additional structured signal data)"
+
+
+_SUPPORTING_DETAIL_PROMPT = """You are writing the supporting-detail section of a portfolio \
+research answer. A deterministic Current Fundamentals Health Score block (shown separately, not \
+written by you) already states the verdict for each signal: revenue growth, margin, insider \
+activity, leadership. Your only job is to add specific supporting detail for EVERY signal below \
+that has real data -- exact numbers, filing citations, dates -- whether that data came from a \
+tool call (news/filings/market data) or from the structured signal data section (computed \
+directly, e.g. XBRL revenue/margin figures). A signal with real data in EITHER section below \
+must get its own paragraph -- do not skip a signal just because its only source is structured \
+data rather than a tool result. Do not state or restate any signal's status or the overall \
+verdict, and do not open with a summary sentence about the verdict. Do not use the words "since", \
+"compared to", "change", "remains", or reference when the user purchased anything -- describe \
+each signal's supporting facts as current facts, not as an answer to a comparison question. One \
+short paragraph per signal that has real data below, clearly labeled, with sources cited where \
+applicable.
+
+STRUCTURED SIGNAL DATA:
+{signal_facts}
+
+TOOL RESULTS:
+{tool_outputs}"""
+_narrative_llm = build_chat_llm(model="gpt-4.1-mini", temperature=0)
+
+
+def _compose_grounded_narrative(tool_outputs: str, signal_facts: str) -> str:
+    prompt = _SUPPORTING_DETAIL_PROMPT.format(tool_outputs=tool_outputs, signal_facts=signal_facts)
+    return _narrative_llm.invoke([("human", prompt)]).content
 
 
 def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: bool = False) -> ChatResult:
@@ -362,15 +576,17 @@ def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: 
         config=config,
     )
     tools_used = get_tools_used(result["messages"])
+    tool_calls = get_tool_calls(result["messages"])
 
-    if _mentions_filings(question) and not (_FILINGS_TOOLS & set(tools_used)):
+    if _question_needs_filings_check(question) and not (_FILINGS_TOOLS & set(tools_used)):
         # Call the real tool ourselves -- don't just ask the model to
         # try again, since that's the exact thing the prompt-only fix
         # already failed to reliably produce.
-        filings_result = search_filings.invoke({
+        forced_filings_args = {
             "ticker": ticker,
             "query": "recent filings, 8-K disclosures, and material events",
-        })
+        }
+        filings_result = search_filings.invoke(forced_filings_args)
         correction = (
             "SYSTEM CHECK: your previous answer discussed filings without actually checking any. "
             "Here is the real result of a filings search you must incorporate:\n\n"
@@ -391,36 +607,44 @@ def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: 
             config=config,
         )
         tools_used = get_tools_used(result["messages"])
+        tool_calls = get_tool_calls(result["messages"])
         if "search_filings" not in tools_used:
             tools_used.append("search_filings")  # forced call above, bypassed the graph's own tool node
+            tool_calls.append({"name": "search_filings", "args": forced_filings_args})
 
-    if _question_invites_temporal_comparison(question) and _implies_unsupported_temporal_comparison(
-        result["messages"][-1].content
-    ):
-        correction = (
-            "SYSTEM CHECK: your previous answer implied a comparison since the user's purchase "
-            "date (e.g. 'since you bought this...'), but the Fundamentals Health Score has no "
-            "stored history -- it is always a current snapshot, so that comparison is not "
-            "something you can actually support. Revise your answer to remove any since-purchase "
-            "or change-over-time framing and present the same findings as CURRENT status only -- "
-            "state plainly that this reflects today's data, not a verified change since purchase. "
-            "Keep all the same facts and citations; only fix the framing."
+    # Deterministic status block prepended to every answer -- see the
+    # comment above _render_current_status_block for why this replaced
+    # four rounds of detect-and-correct attempts. Not written back into
+    # result["messages"] (checkpointed state); it's regenerated fresh
+    # from real data on every turn, same as health_score_text above.
+    #
+    # 6th Q13 attempt: for questions shaped as a since-purchase / has-this-
+    # changed comparison, don't use the agent's own free-text answer as
+    # the narrative -- it has already seen the question's literal wording
+    # and reliably mirrors it (see comment block above
+    # TemporalComparisonQuestion). Instead compose the narrative from this
+    # turn's raw tool outputs PLUS the health score's own structured
+    # signal data (_render_signal_facts -- added after a real test_q13.py
+    # run caught the narrative skipping margin entirely, since margin/
+    # revenue_growth are computed from XBRL directly and never appear in
+    # a tool-call result), in a prompt that never includes the question
+    # text at all. Every other question shape is unaffected and keeps the
+    # normal agent answer.
+    if _question_invites_temporal_comparison(question):
+        narrative = _compose_grounded_narrative(
+            _extract_tool_outputs(result["messages"]),
+            _render_signal_facts(health_score),
         )
-        result = graph.invoke(
-            {
-                "messages": [("human", correction)],
-                "ticker": ticker,
-                "health_score_text": str(health_score),
-            },
-            config=config,
-        )
-        tools_used = get_tools_used(result["messages"])
+    else:
+        narrative = result["messages"][-1].content
+    answer = _render_current_status_block(ticker, health_score) + "\n\n" + narrative
 
     if verbose:
         print_tool_trace(result["messages"])
     return ChatResult(
-        answer=result["messages"][-1].content,
+        answer=answer,
         tools_used=tools_used,
+        tool_calls=tool_calls,
     )
 
 

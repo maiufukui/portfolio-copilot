@@ -1,0 +1,336 @@
+/Users/maiufukui/Developer/Portfolio Tracker Assistant/.venv/lib/python3.12/site-packages/langchain_community/document_loaders/html_bs.py:126: XMLParsedAsHTMLWarning: It looks like you're using an HTML parser to parse an XML document.
+
+Assuming this really is an XML document, what you're doing might work, but you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the Python package 'lxml' installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+
+If you want or need to use an HTML parser on this document, you can make this warning go away by filtering it. To do that, run this code before calling the BeautifulSoup constructor:
+
+    from bs4 import XMLParsedAsHTMLWarning
+    import warnings
+
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+  soup = BeautifulSoup(f, **self.bs_kwargs)
+/Users/maiufukui/Developer/Portfolio Tracker Assistant/.venv/lib/python3.12/site-packages/langchain_community/document_loaders/html_bs.py:126: XMLParsedAsHTMLWarning: It looks like you're using an HTML parser to parse an XML document.
+
+Assuming this really is an XML document, what you're doing might work, but you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the Python package 'lxml' installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+
+If you want or need to use an HTML parser on this document, you can make this warning go away by filtering it. To do that, run this code before calling the BeautifulSoup constructor:
+
+    from bs4 import XMLParsedAsHTMLWarning
+    import warnings
+
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+  soup = BeautifulSoup(f, **self.bs_kwargs)
+/Users/maiufukui/Developer/Portfolio Tracker Assistant/.venv/lib/python3.12/site-packages/langchain_community/document_loaders/html_bs.py:126: XMLParsedAsHTMLWarning: It looks like you're using an HTML parser to parse an XML document.
+
+Assuming this really is an XML document, what you're doing might work, but you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the Python package 'lxml' installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+
+If you want or need to use an HTML parser on this document, you can make this warning go away by filtering it. To do that, run this code before calling the BeautifulSoup constructor:
+
+    from bs4 import XMLParsedAsHTMLWarning
+    import warnings
+
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+  soup = BeautifulSoup(f, **self.bs_kwargs)
+/Users/maiufukui/Developer/Portfolio Tracker Assistant/.venv/lib/python3.12/site-packages/langchain_community/document_loaders/html_bs.py:126: XMLParsedAsHTMLWarning: It looks like you're using an HTML parser to parse an XML document.
+
+Assuming this really is an XML document, what you're doing might work, but you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the Python package 'lxml' installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+
+If you want or need to use an HTML parser on this document, you can make this warning go away by filtering it. To do that, run this code before calling the BeautifulSoup constructor:
+
+    from bs4 import XMLParsedAsHTMLWarning
+    import warnings
+
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+  soup = BeautifulSoup(f, **self.bs_kwargs)
+Loaded 8 test case(s) across 4 ticker(s): ALAB, AAPL, MRVL, NBIS
+
+======================================================================
+ALAB -- 2 case(s)
+======================================================================
+Loading documents for ALAB...
+Building baseline retriever (flat 512-token chunks, k=10)...
+Building parent-child retriever (child search k=15, deduped to k=5 parents)...
+  Index build time -- baseline: 7.4s, parent-child: 3.7s
+Running baseline retriever against ALAB's case(s)...
+Running parent-child retriever against ALAB's case(s)...
+
+======================================================================
+AAPL -- 2 case(s)
+======================================================================
+Loading documents for AAPL...
+Building baseline retriever (flat 512-token chunks, k=10)...
+Building parent-child retriever (child search k=15, deduped to k=5 parents)...
+  Index build time -- baseline: 3.0s, parent-child: 3.6s
+Running baseline retriever against AAPL's case(s)...
+Running parent-child retriever against AAPL's case(s)...
+
+======================================================================
+MRVL -- 2 case(s)
+======================================================================
+Loading documents for MRVL...
+Building baseline retriever (flat 512-token chunks, k=10)...
+Building parent-child retriever (child search k=15, deduped to k=5 parents)...
+  Index build time -- baseline: 6.4s, parent-child: 5.9s
+Running baseline retriever against MRVL's case(s)...
+Running parent-child retriever against MRVL's case(s)...
+
+======================================================================
+NBIS -- 2 case(s)
+======================================================================
+Loading documents for NBIS...
+Building baseline retriever (flat 512-token chunks, k=10)...
+Building parent-child retriever (child search k=15, deduped to k=5 parents)...
+  Index build time -- baseline: 4.9s, parent-child: 5.5s
+Running baseline retriever against NBIS's case(s)...
+Running parent-child retriever against NBIS's case(s)...
+
+======================================================================
+RAW RESPONSES vs. REFERENCE (for diagnosing factual_correctness)
+======================================================================
+
+--- baseline | ALAB / this quarter's gross margin change ---
+Reference: Non-GAAP gross margin was 76.4%, up 70 basis points from the previous quarter, attributed to a lower mix of hardware sales within signal conditioning.
+Response:
+Driver: "Gross margin increased 136 bps to 76.3% for the three months ended March 31, 2026 compared to 74.9% for the same period in 2025. The increase was primarily driven by a favorable product mix."
+
+Type: Backward-looking result
+
+Source: "Gross margin increased 136 bps to 76.3% for the three months ended March 31, 2026 compared to 74.9% for the same period in 2025. The increase was primarily driven by a favorable product mix." (from the section titled "Cost of Revenue, Gross Profit, and Gross Margin" for the three months ended March 31, 2026 and 2025)
+
+--- baseline | ALAB / next quarter's gross margin guidance ---
+Reference: Fiscal Q2 2026 non-GAAP gross margin guidance of approximately 73%, including a 200 basis point non-cash impact from a one-time customer agreement.
+Response:
+Driver: "This outlook includes an estimated 200 basis point non‑cash impact related to a recently executed one‑time agreement with one of our customers."
+
+Type: Forward-looking guidance
+
+Source: "We expect second‑quarter non‑GAAP gross margin to be approximately 73%. This outlook includes an estimated 200 basis point non‑cash impact related to a recently executed one‑time agreement with one of our customers."
+
+--- baseline | AAPL / this quarter's gross margin change ---
+Reference: Company (overall) gross margin was 49.3%, up 110 basis points sequentially, driven by favorable mix and lower tariff-related costs, partly offset by seasonal loss of leverage and higher memory costs; product gross margin alone decreased 200 basis points sequentially on seasonal loss of leverage and higher memory costs.
+Response:
+Driver: "Products gross margin increased during 2025 compared to 2024 primarily due to favorable costs and a different mix of products, partially offset by tariff costs. Products gross margin percentage decreased during 2025 compared to 2024 primarily due to a different mix of products and tariff costs, partially offset by other favorable costs. Services gross margin increased during 2025 compared to 2024 primarily due to higher Services net sales and a different mix of services. Services gross margin percentage increased during 2025 compared to 2024 primarily due to a different mix of services, partially offset by higher costs."
+
+Type: Backward-looking result (reflecting the 2025 fiscal year compared to 2024)
+
+Source:  
+- "Products gross margin increased during 2025 compared to 2024 primarily due to favorable costs and a different mix of products, partially offset by tariff costs."  
+- "Products gross margin percentage decreased during 2025 compared to 2024 primarily due to a different mix of products and tariff costs, partially offset by other favorable costs."  
+- "Services gross margin increased during 2025 compared to 2024 primarily due to higher Services net sales and a different mix of services."  
+- "Services gross margin percentage increased during 2025 compared to 2024 primarily due to a different mix of services, partially offset by higher costs."  
+(From Apple Inc. 2025 Form 10-K excerpts in the provided context)
+
+--- baseline | AAPL / next quarter's gross margin guidance ---
+Reference: June quarter (fiscal Q3 2026) gross margin guidance of 47.5%-48.5%, driven primarily by significantly higher expected memory costs, partially offset by the benefit of carry-in inventory.
+Response:
+Driver: "For the June quarter—and what is embedded in the guidance that Kevan went through earlier—we expect significantly higher memory costs. They are also partly offset by the benefit of carry-in inventory. And while we do not give color beyond June, I can tell you that beyond the June quarter, we believe memory costs will drive an increasing impact on our business."
+
+Type: Forward-looking guidance
+
+Source: Timothy D. Cook, Apple Q2 2026 Earnings Call Transcript, response to margin question from Ben Reitzes (Goldman Sachs)
+
+--- baseline | MRVL / this quarter's data center revenue growth ---
+Reference: Data center revenue was $1.8 billion (76% of total revenue), up 11% sequentially and 27% year-over-year, with growth achieved across optical interconnect, custom silicon, and switching products.
+Response:
+Driver: "We continue to benefit from sustained demand for our 12.8 t and strong ramp of our 5th generation 51.2T switches for scale out networking. We are seeing strong engagement for both existing and new customers for our 51.2t platform, as well as our new 100T platform, which we believe delivers industry leading power efficiency and low latency. Attributes that are increasingly critical for AI infrastructure." Additionally, management highlighted that "our interconnect business to grow more than 70% year over year, well above our prior expectation of 50% growth," and that "data center revenue in fiscal 27 to grow approximately 50% year over year."
+
+Type: Forward-looking guidance
+
+Source:  
+- "We continue to benefit from sustained demand for our 12.8 t and strong ramp of our 5th generation 51.2T switches for scale out networking..." (Full Conference Call Transcript)  
+- "The increase in our revenue outlook continues to be driven by our data center which we now expect to grow approximately 50% this fiscal year. Notably, we expect our interconnect business to grow more than 70% year over year, well above our prior expectation of 50% growth." (Full Conference Call Transcript)  
+- "Marvell delivered record revenue of $2.418 billion reflecting 9% sequential and 28% year over year growth... We are seeing strong demand and exceptional bookings across our entire data center portfolio." (Full Conference Call Transcript)
+
+--- baseline | MRVL / fiscal 2028 data center revenue growth guidance ---
+Reference: Fiscal 2028 data center revenue guidance of approximately 55% year-over-year growth, accelerating from fiscal 2027, driven by interconnect growth (1.6T scale-out demand plus scale-up/scale-across contributions), custom silicon revenue more than doubling, and continued Ethernet switching ramp.
+Response:
+Driver: "We are planning for the rate of cloud CapEx growth to moderate into the 30%-plus range, we expect strong data center revenue growth for Marvell to continue. We expect our interconnect business to continue to outpace cloud CapEx growth reflecting strong 1.6T demand from scale out networking and more meaningful contributions from scale-up, scale-across networking. Now expect our custom business to more than double year over year in fiscal 28 higher than our prior outlook and expect our Ethernet switching business to continue ramping. As a result we expect data center revenue in fiscal 28 to grow approximately 55% year over year accelerating from fiscal 27's projected growth rate."
+
+Type: Forward-looking guidance
+
+Source: Full Conference Call Transcript excerpt:  
+"Now looking ahead to fiscal 28, we are planning for the rate of cloud CapEx growth to moderate into the 30%-plus range, we expect strong data center revenue growth for Marvell to continue. We expect our interconnect business to continue to outpace cloud CapEx growth reflecting strong 1.6T demand from scale out networking and more meaningful contributions from scale-up, scale-across networking. Now expect our custom business to more than double year over year in fiscal 28 higher than our prior outlook and expect our Ethernet switching business to continue ramping. As a result we expect data center revenue in fiscal 28 to grow approximately 55% year over year accelerating from fiscal 27's projected growth rate."
+
+--- baseline | NBIS / this quarter's adjusted EBITDA margin change ---
+Reference: Nebius AI business adjusted EBITDA margin expanded to 45% in Q1 2026, up from 24% in Q4 2025, an improvement management attributed to strong revenue growth (Nebius AI revenue up 841% year-over-year, 82% quarter-over-quarter) driving operating leverage.
+Response:
+Driver: The driver behind this quarter's adjusted EBITDA margin change was "the demand we are seeing in the market, then the terms that we are also able to negotiate with our contracts and the unit economics of the platform itself." Additionally, the margin improvement reflects "the underlying strength of the business." Management also explained that quarter-to-quarter variability is due to timing dynamics where "investments land first and the capacity and the revenue it supports come online shortly after." Specifically, Q1 margin reached 45%, nearly doubling from Q4, driven by strong revenue growth and operating leverage. They expect margins to dip slightly in Q2 due to investments made early in the year and capacity delivery being back-end weighted, with margins returning to Q1 levels in Q3 and stepping higher in Q4. For the full year, they target around 40% adjusted EBITDA margin.
+
+Type: Backward-looking result (Q1 margin improvement already realized) with forward-looking guidance (margin expectations for Q2, Q3, Q4, and full year).
+
+Source:  
+Dado Alonso (CFO) in Q1 2026 earnings call transcript:  
+"Indeed. As you saw in the quarter, our Q1 margins were really strong. Nebius AI adjusted EBITDA margin reached 45%, nearly doubling from Q4. And that really reflects the underlying strength of the business. On the one hand side, the demand we are seeing in the market, then the terms that we are also able to negotiate with our contracts and the unit economics of the platform itself. ... As I mentioned earlier, as we move throughout the year, you will see some quarter-to-quarter variability. ... The investments land first and the capacity and the revenue it supports come online shortly after. So given the timing of our investments in Q2 and the timing of the deployment towards the end of the quarter, we actually expect those margins in Q2 to go a little bit lower, returning to Q1 levels in Q3 and stepping even higher in Q4. So for the full year, group, we expect a margin around 40% as we have guided."
+
+--- baseline | NBIS / next quarter's margin guidance ---
+Reference: Management guided fiscal Q2 2026 group adjusted EBITDA margin to step down sequentially from Q1 levels before returning to Q1 levels in Q3 and moving higher in Q4, driven by the timing of upfront investments (hiring, recent acquisitions, product development) landing before the back-end-weighted capacity and revenue they support comes online -- a timing dynamic, not a structural change, per CFO Dado Alonso.
+Response:
+Driver: "We have made a number of important investments in the first half of the year, hiring across go-to-market and engineering, our recent acquisitions and continued development of new product capabilities. And those investments are already in the cost base today. ... On the capacity side, our delivery this year is back-end weighted, and we have a meaningful step-up coming in Q3. ... given the timing of our investments in Q2 and the timing of the deployment towards the end of the quarter, we actually expect those margins in Q2 to go a little bit lower, returning to Q1 levels in Q3 and stepping even higher in Q4. ... So really, what you are seeing across the quarters is a timing dynamic, not a structural one."  
+Also: "3 key parameters will determine our growth profile and margin progression throughout the year, utilization, pricing and capacity. ... The third, capacity will play an important role in unlocking our growth potential and driving margin flow-through."
+
+Type: Forward-looking guidance
+
+Source: Dado Alonso’s remarks in the Q&A section and earlier margin discussion in the transcript, specifically:  
+- "We expect those margins in Q2 to go a little bit lower, returning to Q1 levels in Q3 and stepping even higher in Q4."  
+- "3 key parameters will determine our growth profile and margin progression throughout the year, utilization, pricing and capacity."  
+- "On capacity, the time line of deploying the new capacity impacts both top and bottom line results from quarter-to-quarter."
+
+--- parent-child | ALAB / this quarter's gross margin change ---
+Reference: Non-GAAP gross margin was 76.4%, up 70 basis points from the previous quarter, attributed to a lower mix of hardware sales within signal conditioning.
+Response:
+Driver: "Non‑GAAP gross margin for the first quarter was 76.4%, up 70 basis points sequentially, primarily driven by a lower mix of hardware sales across our signal conditioning portfolio."
+
+Type: Backward-looking result (this describes what happened in Q1 2026)
+
+Source:  
+From the earnings call transcript:  
+"Non‑GAAP gross margin for the first quarter was 76.4%, up 70 basis points sequentially, primarily driven by a lower mix of hardware sales across our signal conditioning portfolio."
+
+--- parent-child | ALAB / next quarter's gross margin guidance ---
+Reference: Fiscal Q2 2026 non-GAAP gross margin guidance of approximately 73%, including a 200 basis point non-cash impact from a one-time customer agreement.
+Response:
+Driver: "We expect second‑quarter non‑GAAP gross margin to be approximately 73%. This outlook includes an estimated 200 basis point non‑cash impact related to a recently executed one‑time agreement with one of our customers."
+
+Type: Forward-looking guidance
+
+Source: Q1 2026 earnings call transcript, CFO Desmond Lynch’s prepared remarks on Q2 guidance.
+
+--- parent-child | AAPL / this quarter's gross margin change ---
+Reference: Company (overall) gross margin was 49.3%, up 110 basis points sequentially, driven by favorable mix and lower tariff-related costs, partly offset by seasonal loss of leverage and higher memory costs; product gross margin alone decreased 200 basis points sequentially on seasonal loss of leverage and higher memory costs.
+Response:
+Driver: The driver behind this quarter's gross margin change was "favorable mix and lower tariff-related costs, partly offset by seasonal loss of leverage and higher memory costs." Specifically, product gross margin decreased by 200 basis points sequentially "driven by seasonal loss of leverage and higher memory costs," while overall company gross margin increased by 110 basis points sequentially due to "favorable mix and lower tariff-related costs." Timothy D. Cook also noted that tariffs in March were lower than in December due to lower product volume and tariff rate reductions.
+
+Type: Backward-looking result (something that already happened in the reported quarter)
+
+Source:  
+- "product gross margin decreased by 200 basis points sequentially, driven by seasonal loss of leverage and higher memory costs, as Tim alluded to." — Kevan Parekh  
+- "overall company gross margin, the sequential impact was +110 basis points, driven by favorable mix and lower tariff-related costs, partly offset by seasonal loss of leverage and higher memory costs." — Kevan Parekh  
+- "For March, the gross margin of 49.3% did include the impact of tariff-related costs. However, tariffs in March versus December were lower because we had lower product volume sequentially from Q1 to Q2, and there was the full-quarter benefit from a reduction in the IPEA tariff rates as well as the reduced global tariff rate under Section 122." — Timothy D. Cook
+
+--- parent-child | AAPL / next quarter's gross margin guidance ---
+Reference: June quarter (fiscal Q3 2026) gross margin guidance of 47.5%-48.5%, driven primarily by significantly higher expected memory costs, partially offset by the benefit of carry-in inventory.
+Response:
+Driver: "significantly higher memory costs" are expected to impact gross margin in the June quarter, with the effect likely to increase beyond June.
+
+Type: Forward-looking guidance
+
+Source: Timothy D. Cook stated that "significantly higher memory costs" are expected to impact gross margin in the June quarter, with the effect likely to increase beyond June. Additionally, the June quarter gross margin is guided to be "between 47.5% and 48.5%."
+
+--- parent-child | MRVL / this quarter's data center revenue growth ---
+Reference: Data center revenue was $1.8 billion (76% of total revenue), up 11% sequentially and 27% year-over-year, with growth achieved across optical interconnect, custom silicon, and switching products.
+Response:
+Driver: "Strong revenue growth from our data center market was driven by AI-related demand for a broad range of our products, including electro-optics, custom, storage, and switching." Additionally, management stated, "Our data center business is on fire, and we are projecting accelerating revenue growth. For this year and next year already from a strong base. I mean, basically, we were 46% data center growth last year. This year is 50, and next year is looking like 55." They also highlighted "the expanded partnership with NVIDIA that directly integrates Marvell Technology's custom silicon and optical networking into NVIDIA's AI ecosystem," and noted acquisitions (Celestial AI and XConn) that expand their technology portfolio for data center interconnect and switching.
+
+Type: Backward-looking result (the 46% growth last year and 50% growth this year are historical/current results) and Forward-looking guidance (projecting 55% growth next year and beyond, plus commentary on accelerating growth).
+
+Source:  
+- "Strong revenue growth from our data center market was driven by AI-related demand for a broad range of our products, including electro-optics, custom, storage, and switching." (SEC filing excerpt)  
+- "Our data center business is on fire, and we are projecting accelerating revenue growth. For this year and next year already from a strong base. I mean, basically, we were 46% data center growth last year. This year is 50, and next year is looking like 55." (Earnings call transcript, Matthew J. Murphy)  
+- Summary and context on NVIDIA partnership and acquisitions expanding product portfolio supporting data center growth.
+
+--- parent-child | MRVL / fiscal 2028 data center revenue growth guidance ---
+Reference: Fiscal 2028 data center revenue guidance of approximately 55% year-over-year growth, accelerating from fiscal 2027, driven by interconnect growth (1.6T scale-out demand plus scale-up/scale-across contributions), custom silicon revenue more than doubling, and continued Ethernet switching ramp.
+Response:
+Driver: The driver behind fiscal 2028 data center revenue growth guidance is "strong 1.6T demand from scale out networking and more meaningful contributions from scale-up, scale-across networking," along with the expectation that the "custom business [will] more than double year over year in fiscal 28 higher than our prior outlook" and that the "Ethernet switching business [will] continue ramping." Management stated:  
+- "We expect data center revenue in fiscal 28 to grow approximately 55% year over year accelerating from fiscal 27's projected growth rate."  
+- "We expect our interconnect business to continue to outpace cloud CapEx growth reflecting strong 1.6T demand from scale out networking and more meaningful contributions from scale-up, scale-across networking."  
+- "Now expect our custom business to more than double year over year in fiscal 28 higher than our prior outlook and expect our Ethernet switching business to continue ramping."
+
+Type: Forward-looking guidance (projecting fiscal 2028 growth)
+
+Source: Full Conference Call Transcript excerpt:  
+"Now looking ahead to fiscal 28, we are planning for the rate of cloud CapEx growth to moderate into the 30%-plus range, we expect strong data center revenue growth for Marvell to continue. We expect our interconnect business to continue to outpace cloud CapEx growth reflecting strong 1.6T demand from scale out networking and more meaningful contributions from scale-up, scale-across networking. Now expect our custom business to more than double year over year in fiscal 28 higher than our prior outlook and expect our Ethernet switching business to continue ramping As a result we expect data center revenue in fiscal 28 to grow approximately 55% year over year accelerating from fiscal 27's projected growth rate."
+
+--- parent-child | NBIS / this quarter's adjusted EBITDA margin change ---
+Reference: Nebius AI business adjusted EBITDA margin expanded to 45% in Q1 2026, up from 24% in Q4 2025, an improvement management attributed to strong revenue growth (Nebius AI revenue up 841% year-over-year, 82% quarter-over-quarter) driving operating leverage.
+Response:
+Driver: "Our Q1 margins were really strong. Nebius AI adjusted EBITDA margin reached 45%, nearly doubling from Q4. And that really reflects the underlying strength of the business. On the one hand side, the demand we are seeing in the market, then the terms that we are also able to negotiate with our contracts and the unit economics of the platform itself." Additionally, the margin change is influenced by "a number of important investments in the first half of the year, hiring across go-to-market and engineering, our recent acquisitions and continued development of new product capabilities. And those investments are already in the cost base today." The margin progression is described as a "timing dynamic, not a structural one," with investments landing first and capacity/revenue coming online shortly after, causing quarter-to-quarter variability.
+
+Type: Backward-looking result (Q1 margin improvement already realized) with explanation of expected margin dynamics for the rest of the year (forward-looking guidance on margin progression).
+
+Source:  
+- Dado Alonso: "As you saw in the quarter, our Q1 margins were really strong. Nebius AI adjusted EBITDA margin reached 45%, nearly doubling from Q4. And that really reflects the underlying strength of the business. On the one hand side, the demand we are seeing in the market, then the terms that we are also able to negotiate with our contracts and the unit economics of the platform itself."  
+- "We have made a number of important investments in the first half of the year... those investments are already in the cost base today."  
+- "The investments land first and the capacity and the revenue it supports come online shortly after. So given the timing of our investments in Q2 and the timing of the deployment towards the end of the quarter, we actually expect those margins in Q2 to go a little bit lower, returning to Q1 levels in Q3 and stepping even higher in Q4."
+
+--- parent-child | NBIS / next quarter's margin guidance ---
+Reference: Management guided fiscal Q2 2026 group adjusted EBITDA margin to step down sequentially from Q1 levels before returning to Q1 levels in Q3 and moving higher in Q4, driven by the timing of upfront investments (hiring, recent acquisitions, product development) landing before the back-end-weighted capacity and revenue they support comes online -- a timing dynamic, not a structural change, per CFO Dado Alonso.
+Response:
+Driver: "We anticipate a nonlinear quarterly adjusted EBITDA margin progression during 2026. We will see this in Q2 given the back-end weighted nature of the capacity we bring online. These investments unlock growth by increasing capacity substantially from Q2 to Q3, leading us to be confident in our adjusted EBITDA margin returning to Q1 levels in Q3 before moving even higher in Q4." Additionally, Dado Alonso explained: "We have made a number of important investments in the first half of the year... those investments are already in the cost base today... On the capacity side, our delivery this year is back-end weighted, and we have a meaningful step-up coming in Q3... given the timing of our investments in Q2 and the timing of the deployment towards the end of the quarter, we actually expect those margins in Q2 to go a little bit lower, returning to Q1 levels in Q3 and stepping even higher in Q4."
+
+Type: Forward-looking guidance
+
+Source: Management commentary in the earnings call transcript, specifically the Q&A section with Dado Alonso and the earlier management remarks on margin progression for 2026.
+
+Scoring baseline (flat 512-tok) (8 case(s))...
+Evaluating:   0%|          | 0/24 [00:00<?, ?it/s]Evaluating:   4%|▍         | 1/24 [00:02<00:56,  2.47s/it]Evaluating:   8%|▊         | 2/24 [00:02<00:23,  1.09s/it]Evaluating:  12%|█▎        | 3/24 [00:03<00:17,  1.18it/s]Evaluating:  17%|█▋        | 4/24 [00:03<00:12,  1.56it/s]Evaluating:  21%|██        | 5/24 [00:04<00:11,  1.66it/s]Evaluating:  25%|██▌       | 6/24 [00:05<00:18,  1.01s/it]Evaluating:  29%|██▉       | 7/24 [00:06<00:14,  1.16it/s]Evaluating:  33%|███▎      | 8/24 [00:09<00:25,  1.56s/it]Evaluating:  38%|███▊      | 9/24 [00:11<00:25,  1.73s/it]Evaluating:  42%|████▏     | 10/24 [00:12<00:21,  1.54s/it]Evaluating:  46%|████▌     | 11/24 [00:13<00:17,  1.32s/it]Evaluating:  50%|█████     | 12/24 [00:14<00:14,  1.17s/it]Evaluating:  54%|█████▍    | 13/24 [00:14<00:09,  1.16it/s]Evaluating:  58%|█████▊    | 14/24 [00:15<00:09,  1.03it/s]Evaluating:  62%|██████▎   | 15/24 [00:20<00:18,  2.02s/it]Evaluating:  67%|██████▋   | 16/24 [00:22<00:16,  2.06s/it]Evaluating:  71%|███████   | 17/24 [00:26<00:18,  2.69s/it]Evaluating:  75%|███████▌  | 18/24 [00:31<00:19,  3.33s/it]Evaluating:  79%|███████▉  | 19/24 [00:31<00:12,  2.55s/it]Evaluating:  83%|████████▎ | 20/24 [00:32<00:07,  1.98s/it]Evaluating:  88%|████████▊ | 21/24 [00:35<00:06,  2.18s/it]Evaluating:  92%|█████████▏| 22/24 [00:37<00:04,  2.08s/it]Evaluating:  96%|█████████▌| 23/24 [00:45<00:04,  4.11s/it]Evaluating: 100%|██████████| 24/24 [00:54<00:00,  5.31s/it]Evaluating: 100%|██████████| 24/24 [00:54<00:00,  2.25s/it]
+
+Scoring parent-child (8 case(s))...
+Evaluating:   0%|          | 0/24 [00:00<?, ?it/s]Evaluating:   4%|▍         | 1/24 [00:02<01:01,  2.68s/it]Evaluating:   8%|▊         | 2/24 [00:03<00:30,  1.37s/it]Evaluating:  17%|█▋        | 4/24 [00:04<00:15,  1.27it/s]Evaluating:  21%|██        | 5/24 [00:05<00:17,  1.07it/s]Evaluating:  25%|██▌       | 6/24 [00:07<00:24,  1.38s/it]Evaluating:  29%|██▉       | 7/24 [00:09<00:26,  1.57s/it]Evaluating:  38%|███▊      | 9/24 [00:12<00:21,  1.46s/it]Evaluating:  42%|████▏     | 10/24 [00:13<00:18,  1.29s/it]Evaluating:  46%|████▌     | 11/24 [00:13<00:14,  1.09s/it]Evaluating:  50%|█████     | 12/24 [00:14<00:12,  1.06s/it]Evaluating:  54%|█████▍    | 13/24 [00:16<00:14,  1.29s/it]Evaluating:  58%|█████▊    | 14/24 [00:17<00:13,  1.31s/it]Evaluating:  62%|██████▎   | 15/24 [00:26<00:31,  3.52s/it]Evaluating:  67%|██████▋   | 16/24 [00:27<00:21,  2.74s/it]Evaluating:  71%|███████   | 17/24 [00:28<00:15,  2.20s/it]Evaluating:  75%|███████▌  | 18/24 [00:29<00:11,  1.86s/it]Evaluating:  79%|███████▉  | 19/24 [00:29<00:06,  1.35s/it]Evaluating:  83%|████████▎ | 20/24 [00:32<00:07,  1.86s/it]Evaluating:  88%|████████▊ | 21/24 [00:36<00:07,  2.48s/it]Evaluating:  92%|█████████▏| 22/24 [00:37<00:03,  1.85s/it]Evaluating:  96%|█████████▌| 23/24 [00:37<00:01,  1.52s/it]Evaluating: 100%|██████████| 24/24 [00:43<00:00,  2.88s/it]Evaluating: 100%|██████████| 24/24 [00:43<00:00,  1.83s/it]
+
+======================================================================
+BEFORE/AFTER -- Task 6 parent-child retriever vs. baseline
+(8 case(s) across 4 ticker(s): ALAB, AAPL, MRVL, NBIS)
+======================================================================
+              retriever                                                   case  faithfulness  context_recall  factual_correctness(mode=f1)
+baseline (flat 512-tok)              ALAB / this quarter's gross margin change      1.000000             0.0                          0.29
+baseline (flat 512-tok)            ALAB / next quarter's gross margin guidance      1.000000             1.0                          0.86
+baseline (flat 512-tok)              AAPL / this quarter's gross margin change      1.000000             1.0                          0.10
+baseline (flat 512-tok)            AAPL / next quarter's gross margin guidance      1.000000             1.0                          0.50
+baseline (flat 512-tok)       MRVL / this quarter's data center revenue growth      0.800000             1.0                          0.09
+baseline (flat 512-tok) MRVL / fiscal 2028 data center revenue growth guidance      1.000000             1.0                          0.78
+baseline (flat 512-tok)    NBIS / this quarter's adjusted EBITDA margin change      0.937500             1.0                          0.38
+baseline (flat 512-tok)                  NBIS / next quarter's margin guidance      1.000000             1.0                          0.90
+           parent-child              ALAB / this quarter's gross margin change      1.000000             1.0                          0.75
+           parent-child            ALAB / next quarter's gross margin guidance      1.000000             1.0                          0.50
+           parent-child              AAPL / this quarter's gross margin change      1.000000             1.0                          0.63
+           parent-child            AAPL / next quarter's gross margin guidance      0.714286             1.0                          0.40
+           parent-child       MRVL / this quarter's data center revenue growth      1.000000             1.0                          0.13
+           parent-child MRVL / fiscal 2028 data center revenue growth guidance      1.000000             1.0                          0.82
+           parent-child    NBIS / this quarter's adjusted EBITDA margin change      1.000000             1.0                          0.23
+           parent-child                  NBIS / next quarter's margin guidance      1.000000             1.0                          0.82
+
+Mean per retriever (RAGAS triad):
+                         faithfulness  context_recall  factual_correctness(mode=f1)
+retriever                                                                          
+baseline (flat 512-tok)      0.967187           0.875                        0.4875
+parent-child                 0.964286           1.000                        0.5350
+
+======================================================================
+RETRIEVAL LATENCY + COST (Session 7's cost/latency dimension)
+======================================================================
+
+Retrieved context size + query-time latency + per-question synthesis-input cost:
+retriever       case                                          contexts  chars    tokens   latency   ~$/query 
+baseline        ALAB / this quarter's gross margin change     10        24795    5047     0.426   s $0.00202 
+baseline        ALAB / next quarter's gross margin guidance   10        24595    4760     0.215   s $0.00190 
+baseline        AAPL / this quarter's gross margin change     10        20642    4828     0.272   s $0.00193 
+baseline        AAPL / next quarter's gross margin guidance   10        19618    4499     1.156   s $0.00180 
+baseline        MRVL / this quarter's data center revenue gro 10        19959    4076     0.235   s $0.00163 
+baseline        MRVL / fiscal 2028 data center revenue growth 10        20578    4116     0.274   s $0.00165 
+baseline        NBIS / this quarter's adjusted EBITDA margin  10        15761    3866     0.363   s $0.00155 
+baseline        NBIS / next quarter's margin guidance         10        17085    3643     0.240   s $0.00146 
+parent-child    ALAB / this quarter's gross margin change     5         34501    6842     0.352   s $0.00274 
+parent-child    ALAB / next quarter's gross margin guidance   5         34501    6842     0.210   s $0.00274 
+parent-child    AAPL / this quarter's gross margin change     5         10028    2095     0.326   s $0.00084 
+parent-child    AAPL / next quarter's gross margin guidance   5         13622    2829     0.235   s $0.00113 
+parent-child    MRVL / this quarter's data center revenue gro 4         28829    5596     0.283   s $0.00224 
+parent-child    MRVL / fiscal 2028 data center revenue growth 5         33012    6342     0.309   s $0.00254 
+parent-child    NBIS / this quarter's adjusted EBITDA margin  5         21328    4563     0.276   s $0.00183 
+parent-child    NBIS / next quarter's margin guidance         5         13617    2700     0.246   s $0.00108 
+
+Means per retriever (latency + cost):
+  baseline        mean retrieval latency: 0.398s | mean context tokens/query: 4354 | mean ~$/query (synthesis input only): $0.00174
+  parent-child    mean retrieval latency: 0.280s | mean context tokens/query: 4726 | mean ~$/query (synthesis input only): $0.00189
+
+One-time index-build cost estimate (embedding the corpus, not a per-query cost), by ticker:
+  ALAB: ~$0.0026 (same for both retrievers -- both embed the same source documents)
+  AAPL: ~$0.0018 (same for both retrievers -- both embed the same source documents)
+  MRVL: ~$0.0043 (same for both retrievers -- both embed the same source documents)
+  NBIS: ~$0.0032 (same for both retrievers -- both embed the same source documents)
+
+Reading this honestly: parent-child's per-query cost is higher (fewer, larger context units -- see mean context tokens/query above), which is the direct tradeoff for the completeness win reported in the RAGAS table above, not a free upgrade. Index-build cost and retrieval latency are dominated by embedding-call round-trip time in both conditions, not by which retriever structure is used, so the two conditions are not meaningfully different on latency alone in this environment -- cost, not speed, is parent-child's real tradeoff.

@@ -1,9 +1,10 @@
 """
 Eval harness runner for the Personal Portfolio Copilot capstone.
 
-Reads eval_dataset.json (13 locked questions) and runs each one that's
-actually buildable today against real pipelines, scoring with the two
-methods described in the PRD (Task 1 §4, "Evaluation methodology"):
+Reads eval_dataset.json (12 locked questions -- ids 1-9, 11-13; id 10 was
+retired) and runs each one that's actually buildable today against real
+pipelines, scoring with the two methods described in the PRD (Task 1 §4,
+"Evaluation methodology"):
 
 - RAG questions (category "rag"): scored with RAGAS -- Faithfulness always,
   plus LLMContextRecall and FactualCorrectness when a test case has a
@@ -12,23 +13,36 @@ methods described in the PRD (Task 1 §4, "Evaluation methodology"):
   SingleTurnSample -> EvaluationDataset -> ragas.evaluate().
 
 - Tool-calling questions (category "tool_calling" / "hybrid"): NOT scored
-  with tool-call/goal/topic-adherence metrics yet. Those metrics need a
-  normalized LangGraph trace (Session 6, Breakout Room #2) -- and the
-  LangGraph agent itself doesn't exist yet (still pending: "Build LangGraph
-  agent graph"). Running the standalone test_q*.py script for these and
-  printing raw output for manual review, rather than fabricating a score
-  with no real trace behind it.
+  by this file directly -- it prints a pointer to each question's own
+  standalone test_qN.py script for manual review, rather than duplicating
+  that scoring logic here. As of this session, three of those scripts
+  (test_q9.py, test_q11.py, test_q13.py) score real RAGAS multi-turn
+  metrics -- ToolCallAccuracy and AgentGoalAccuracyWithReference (see
+  eval_tool_call_accuracy.py) -- against the real deployed LangGraph
+  agent (app/graph.py), plus a custom PASS/FAIL LLM-judge prompt for
+  criteria RAGAS doesn't cover (source coverage, citation quality, etc).
+  The remaining built tool-calling questions (Q2, Q4, Q6, Q7, Q8) still
+  use ONLY a hand-written PASS/FAIL judge prompt, not RAGAS's real
+  metric classes -- a known gap, tracked in the PRD's Open Items, not
+  yet closed for those five. Run the script named in each question's
+  "reuses" field directly to see its actual scoring.
 
 Only questions with status "built" in eval_dataset.json are run at all.
 "not_built" / "partially_built" / "deferred" questions are listed but
 skipped, with the reason printed -- see eval_dataset.json's "reuses" field
 per question for exactly what's missing.
 
+For a single consolidated run across every question that has ANY real
+automated scoring (RAG questions here plus Q7/Q9/Q11/Q13's tool-calling
+scoring), persisted to one JSON scorecard instead of scattered stdout
+across 8 separate scripts, see run_scorecard.py -- it imports this
+file's RAG_RUNNERS directly rather than duplicating this scoring logic.
+
 Usage:
     python run_eval.py                        # run everything runnable
     python run_eval.py --question 1           # run just question id 1
     python run_eval.py --question 5 --verbose # + full input/context/response/reference per case
-    python run_eval.py --list                 # print status of all 13, run nothing
+    python run_eval.py --list                 # print status of all 12, run nothing
 """
 
 from __future__ import annotations
@@ -278,17 +292,21 @@ def score_rag_question(question: dict, verbose: bool = False) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tool-calling questions -- run the underlying script for manual review only.
-# No tool-call/goal/topic-adherence score yet -- that needs a real LangGraph
-# agent trace, which doesn't exist (agent graph itself is still unbuilt).
+# Tool-calling questions -- not scored by this file directly. The real
+# LangGraph agent (app/graph.py) exists and is what these questions run
+# against, but this runner points to each question's own standalone
+# test_qN.py script rather than re-implementing its scoring here. Q9/Q11/
+# Q13's scripts score real RAGAS ToolCallAccuracy + AgentGoalAccuracy
+# WithReference (eval_tool_call_accuracy.py) plus a custom judge; Q2/Q4/
+# Q6/Q7/Q8's scripts still use only a custom PASS/FAIL judge prompt (Open
+# Items gap, not yet closed for those five).
 # ---------------------------------------------------------------------------
 
 def run_tool_question(question: dict) -> None:
     qid = question["id"]
-    print(f"  [Q{qid}] tool-calling question -- running underlying script for manual "
-          f"review only. Automated tool-call/goal/topic-adherence scoring requires a "
-          f"LangGraph trace (Session 6), which needs the agent graph to exist first "
-          f"(still pending). Reuses: {question['reuses']}")
+    print(f"  [Q{qid}] tool-calling/hybrid question -- not scored by run_eval.py "
+          f"directly. Run its own standalone script for real scoring. "
+          f"Reuses: {question['reuses']}")
 
 
 # ---------------------------------------------------------------------------
@@ -343,8 +361,10 @@ def main():
             run_tool_question(q)
 
     print("\n" + "=" * 70)
-    print("Done. RAG questions above have real RAGAS scores. Tool-calling "
-          "questions are unscored pending the LangGraph agent build.")
+    print("Done. RAG questions above have real RAGAS scores from this run. "
+          "Tool-calling/hybrid questions are not scored by this file -- run "
+          "each one's own test_qN.py script directly (see the reuses field "
+          "printed above, or --list).")
     print("=" * 70)
 
 
