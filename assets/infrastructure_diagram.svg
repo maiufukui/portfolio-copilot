@@ -1,0 +1,104 @@
+<svg viewBox="0 0 1160 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="infraTitle infraDesc">
+  <title id="infraTitle">Personal Portfolio Copilot — Infrastructure Diagram</title>
+  <desc id="infraDesc">Five-tier architecture: Next.js UI on Render calls a FastAPI/LangGraph backend with an in-memory checkpointer; the backend routes model calls through a Portkey gateway to GPT-4.1 mini, and calls four tools directly — Qdrant vector search, keyword/exact-match search, Tavily live search, Finnhub market data, and SEC EDGAR filings/XBRL; LangSmith observes the backend via traces.</desc>
+  <defs>
+    <style>
+      :root{
+        --bg:#ffffff;
+        --lane-ui:#eef4ff; --stroke-ui:#4285f4;
+        --lane-be:#fff8e6; --stroke-be:#f9ab00;
+        --lane-llm:#eafbf0; --stroke-llm:#34a853;
+        --lane-data:#fdedec; --stroke-data:#ea4335;
+        --lane-mon:#f5f0fd; --stroke-mon:#a142f4;
+        --text:#202124; --text-muted:#5f6368; --arrow:#80868b; --box-fill:#ffffff;
+      }
+      .lane-label{ font: 600 12px -apple-system,Helvetica,Arial,sans-serif; letter-spacing:.06em; fill:var(--text-muted); text-transform:uppercase; }
+      .box-title{ font: 700 14px -apple-system,Helvetica,Arial,sans-serif; fill:var(--text); }
+      .box-sub{ font: 400 11px -apple-system,Helvetica,Arial,sans-serif; fill:var(--text-muted); }
+      .box{ fill:var(--box-fill); stroke-width:1.75; }
+      .conn{ fill:none; stroke:var(--arrow); stroke-width:1.75; }
+      .conn-dashed{ fill:none; stroke:var(--arrow); stroke-width:1.75; stroke-dasharray:5 4; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--arrow)"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1160" height="700" fill="var(--bg)"/>
+
+  <!-- Lane 1: UI -->
+  <rect x="20" y="20" width="1120" height="90" rx="10" fill="var(--lane-ui)" stroke="var(--lane-ui)"/>
+  <text x="36" y="38" class="lane-label">User Interface</text>
+  <rect x="460" y="37" width="240" height="56" rx="8" class="box" stroke="var(--stroke-ui)"/>
+  <text x="580" y="60" class="box-title" text-anchor="middle">Next.js Chat UI</text>
+  <text x="580" y="78" class="box-sub" text-anchor="middle">Render — phone &amp; laptop</text>
+
+  <!-- Lane 2: Backend -->
+  <rect x="20" y="125" width="1120" height="110" rx="10" fill="var(--lane-be)" stroke="var(--lane-be)"/>
+  <text x="36" y="143" class="lane-label">Backend — Render</text>
+  <rect x="340" y="150" width="260" height="60" rx="8" class="box" stroke="var(--stroke-be)"/>
+  <text x="470" y="176" class="box-title" text-anchor="middle">FastAPI + LangGraph</text>
+  <text x="470" y="195" class="box-sub" text-anchor="middle">Orchestrator</text>
+  <rect x="620" y="150" width="200" height="60" rx="8" class="box" stroke="var(--stroke-be)"/>
+  <text x="720" y="176" class="box-title" text-anchor="middle">Checkpointer</text>
+  <text x="720" y="195" class="box-sub" text-anchor="middle">MemorySaver · in-memory</text>
+  <path class="conn" marker-end="url(#arrow)" d="M600,180 L620,180"/>
+
+  <!-- Lane 3: LLM Layer -->
+  <rect x="20" y="250" width="1120" height="110" rx="10" fill="var(--lane-llm)" stroke="var(--lane-llm)"/>
+  <text x="36" y="268" class="lane-label">LLM Layer</text>
+  <rect x="360" y="275" width="200" height="60" rx="8" class="box" stroke="var(--stroke-llm)"/>
+  <text x="460" y="301" class="box-title" text-anchor="middle">Portkey Gateway</text>
+  <text x="460" y="319" class="box-sub" text-anchor="middle">LLM gateway routing</text>
+  <rect x="620" y="275" width="200" height="60" rx="8" class="box" stroke="var(--stroke-llm)"/>
+  <text x="720" y="301" class="box-title" text-anchor="middle">GPT-4.1 mini</text>
+  <text x="720" y="319" class="box-sub" text-anchor="middle">every model call</text>
+  <path class="conn" marker-end="url(#arrow)" d="M560,305 L620,305"/>
+
+  <!-- Lane 4: Data & Tools -->
+  <rect x="20" y="380" width="1120" height="150" rx="10" fill="var(--lane-data)" stroke="var(--lane-data)"/>
+  <text x="36" y="398" class="lane-label">Data &amp; Tools</text>
+
+  <rect x="65" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
+  <text x="160" y="447" class="box-title" text-anchor="middle">Qdrant</text>
+  <text x="160" y="465" class="box-sub" text-anchor="middle">vector store — filings</text>
+
+  <rect x="275" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
+  <text x="370" y="447" class="box-title" text-anchor="middle">Keyword Search</text>
+  <text x="370" y="465" class="box-sub" text-anchor="middle">exact-match recall</text>
+
+  <rect x="485" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
+  <text x="580" y="447" class="box-title" text-anchor="middle">Tavily</text>
+  <text x="580" y="465" class="box-sub" text-anchor="middle">live news search</text>
+
+  <rect x="695" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
+  <text x="790" y="447" class="box-title" text-anchor="middle">Finnhub</text>
+  <text x="790" y="465" class="box-sub" text-anchor="middle">market + insider data</text>
+
+  <rect x="905" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
+  <text x="1000" y="447" class="box-title" text-anchor="middle">SEC EDGAR</text>
+  <text x="1000" y="465" class="box-sub" text-anchor="middle">filings + XBRL</text>
+
+  <!-- Lane 5: Monitoring -->
+  <rect x="20" y="545" width="1120" height="90" rx="10" fill="var(--lane-mon)" stroke="var(--lane-mon)"/>
+  <text x="36" y="563" class="lane-label">Monitoring</text>
+  <rect x="460" y="567" width="240" height="56" rx="8" class="box" stroke="var(--stroke-mon)"/>
+  <text x="580" y="590" class="box-title" text-anchor="middle">LangSmith</text>
+  <text x="580" y="608" class="box-sub" text-anchor="middle">traces every LangGraph run</text>
+
+  <!-- Flow connectors -->
+  <path class="conn" marker-end="url(#arrow)" d="M580,93 L580,110 L470,110 L470,150"/>
+  <path class="conn" marker-end="url(#arrow)" d="M470,210 L470,242 L460,242 L460,275"/>
+
+  <!-- Backend -> tool bus (fan-out to Data & Tools) -->
+  <path class="conn" d="M340,190 L200,190 L200,370"/>
+  <path class="conn" d="M200,370 L1000,370"/>
+  <path class="conn" marker-end="url(#arrow)" d="M160,370 L160,420"/>
+  <path class="conn" marker-end="url(#arrow)" d="M370,370 L370,420"/>
+  <path class="conn" marker-end="url(#arrow)" d="M580,370 L580,420"/>
+  <path class="conn" marker-end="url(#arrow)" d="M790,370 L790,420"/>
+  <path class="conn" marker-end="url(#arrow)" d="M1000,370 L1000,420"/>
+
+  <!-- Backend -> Monitoring (observability, dashed) -->
+  <path class="conn-dashed" marker-end="url(#arrow)" d="M820,180 L1112,180 L1112,595 L700,595"/>
+</svg>
