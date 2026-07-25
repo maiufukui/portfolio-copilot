@@ -39,6 +39,8 @@ TICKER_TO_CIK = {
     "AAPL": "0000320193",
     "MRVL": "0001835632",
     "NBIS": "0001513845",  # confirmed via app.edgar.tools/companies/NBIS
+    "PANW": "0001327567",  # resolved via ingest_ticker.py -> SEC company_tickers.json, 2026-07-25
+    "DELL": "0001571996",  # resolved via ingest_ticker.py -> SEC company_tickers.json, 2026-07-25
 }
 
 # Revenue is tagged inconsistently across companies -- try in this order,

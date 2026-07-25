@@ -85,6 +85,8 @@ TICKER_TO_COMPANY = {
     "AAPL": "Apple",
     "MRVL": "Marvell",
     "NBIS": "Nebius",
+    "PANW": "Palo Alto Networks",
+    "DELL": "Dell Technologies",
 }
 
 # ---------------------------------------------------------------------

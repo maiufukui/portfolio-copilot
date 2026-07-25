@@ -24,6 +24,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import time
 
 import yfinance as yf
@@ -41,9 +42,12 @@ load_dotenv()  # redundant with app/db.py's own load_dotenv() call, but matches
 # import of app.tools (which would drag in the full LangChain/Qdrant
 # import chain for a one-time script that has nothing to do with any
 # of that). This is the same "one ticker list per ingestion script"
-# debt already flagged for the XBRL CIK dict, not a new decision --
-# update all three together when PANW/DELL land (doc item 6).
-TICKERS = ["ALAB", "AAPL", "MRVL", "NBIS"]
+# debt already flagged for the XBRL CIK dict, not a new decision.
+# PANW/DELL added here now that they've actually landed (item 6) --
+# filings + transcripts already ingested and CIKs resolved via
+# ingest_ticker.py; this list just needs to catch up so their price
+# history gets backfilled too.
+TICKERS = ["ALAB", "AAPL", "MRVL", "NBIS", "PANW", "DELL"]
 
 PERIOD = "1y"
 
@@ -89,10 +93,21 @@ def fetch_and_save(ticker: str) -> int:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ticker",
+        help="Backfill just this one ticker instead of all of TICKERS. Use this for a new "
+        "ticker (e.g. after ingest_ticker.py) instead of re-running the full list -- each write "
+        "is a harmless upsert either way, but re-fetching tickers that are already backfilled is "
+        "wasted yfinance calls for no benefit.",
+    )
+    args = parser.parse_args()
+    targets = [args.ticker.upper()] if args.ticker else TICKERS
+
     db.init_db()
-    print(f"Backfilling {len(TICKERS)} tickers: {', '.join(TICKERS)}")
+    print(f"Backfilling {len(targets)} ticker(s): {', '.join(targets)}")
     results = {}
-    for ticker in TICKERS:
+    for ticker in targets:
         count = fetch_and_save(ticker)
         results[ticker] = count
         print(f"  {ticker}: {count} rows written")

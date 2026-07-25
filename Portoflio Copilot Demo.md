@@ -135,11 +135,23 @@ here, not run live. They have since actually been run, for real, locally:
 One thing hit and fixed along the way: `pytest` was missing from `requirements.txt` (only installed
 directly in the sandbox's own test env, not committed) — added now.
 
-One thing still open, not yet verified: `server.py`'s new `DATABASE_URL` startup check and
-`db.init_db()` call haven't been exercised against an actual Render deploy yet — only tested via
-local `python -c` calls and the local pytest run above. Deploy and confirm the live Render service
-still boots cleanly and a real chat question against it reflects this data before calling that part
-done.
+**Deployed and confirmed live (2026-07-25):** commit `c37481d` pushed to `github.com:maiufukui/
+portfolio-copilot.git`, redeployed on Render, and the actual live chat now answers a real price-drop
+question correctly — real week/month numbers, a direct should-I-sell answer grounded in them, correct
+sourcing. This also shipped a second, previously-undeployed fix along with it: `app/graph.py`'s
+temporal-comparison classifier (the Q13 guard) had been sitting committed-nowhere on disk since an
+earlier session, so the live app had never actually had that fix either — the original broken-chat
+symptom was two undeployed fixes stacked together, not a new bug introduced this session. Root-cause
+chain, for the record: uncommitted local changes -> stale deploy -> misdiagnosed as a live classifier
+bug -> falsified by Maiu testing the "today" phrasing directly against the deployed app -> confirmed
+via local `--verbose` run that the code was already correct -> traced to `git status` showing 8
+modified + 6 untracked files never committed -> fixed by committing and redeploying, not by patching
+code that didn't need it.
+
+`render.yaml` also fixed: added `DATABASE_URL` (was missing entirely), removed the now-dead
+`FMP_API_KEY` line. Not touched: `plan: free` in both service blocks still doesn't match the actual
+provisioned plan (Render Starter, paid) — left alone deliberately, since editing a Blueprint's `plan`
+field is a billing-consequential change, not a docs fix, and wasn't asked for.
 
 ### Assumptions
 
@@ -278,6 +290,58 @@ questions or under-responds to a genuinely serious one.
 ---
 
 ## 3. Automated transcript ingestion pipeline [MUST WORK FOR DEMO]
+
+### Status: built, unit-tested, and verified against a real saved page — not yet run live
+
+`fetch_transcripts.py`, `ingest_ticker.py`, and `test_fetch_transcripts.py` are written. What's
+actually verified, precisely:
+
+- **Real site-structure investigation, not assumed:** fool.com is a Next.js app. The actual article
+  body isn't literal `<h2>`/`<p>` tags in the raw HTML — it's server-rendered as HTML strings
+  embedded inside JSON-escaped React Server Component ("flight") payloads
+  (`self.__next_f.push([1,"..."])` calls). Confirmed directly against this repo's own saved ALAB
+  page, not guessed.
+- **A real bug found and fixed during verification, not just written and trusted:** the first working
+  version leaked unrelated page-chrome content (promo widgets, disclosure metadata, serialized as raw
+  React-element JSON rather than HTML) into the saved output, past the real transcript's end. Fixed by
+  detecting that pattern and stopping extraction there; the QA gate now also checks for it directly as
+  defense-in-depth, not just relying on the extraction-side fix holding.
+- **18 tests, all passing** (`test_fetch_transcripts.py`) — unit tests for speaker-turn detection,
+  continuation-paragraph joining, unattributed-intro handling, and the page-chrome contamination bug
+  specifically (a real regression test, not a synthetic nice-to-have), plus a genuine integration test
+  against the real saved ALAB page confirming the full pipeline extracts real participants, passes the
+  QA gate, and ends with the real disclosure footer, not garbage.
+- Re-extracting ALAB's known transcript produces 50,602 chars vs. the hand-built reference's 50,751 —
+  same structure, same content, minor known gap: 2 substitute analysts (labeled generically as
+  "Analyst" on the page rather than by name) aren't individually named the way the original manual
+  build hand-corrected them to be. Disclosed, not hidden — doesn't affect QA-gate passage or content
+  completeness.
+
+**Live-verified — run for real by Maiu, locally (2026-07-25):** both PANW and DELL ran end to end,
+for real. Filings: 21 real 10-K/10-Q/8-K documents saved for PANW, 16 for DELL, straight from SEC.
+Transcripts: real URLs found via live Tavily search (neither guessed nor pre-known to this script —
+`fool.com/earnings/call-transcripts/2026/06/02/panw-q3-2026-earnings-transcript` and
+`.../2026/02/26/dell-dell-q4-2026-earnings-call-transcript`), fetched, parsed, and QA-gate-passed:
+39,179 chars for PANW, 61,700 for DELL, both with real participant lists, real TAKEAWAYS/SUMMARY
+content, and correctly structured speaker turns — confirmed directly by reading the saved files, not
+just trusting the "OK" print line. `pytest test_fetch_transcripts.py -v` still 18/18 passing
+afterward. CIKs resolved correctly for both (PANW `0001327567`, DELL `0001571996`).
+
+This closes the one thing that couldn't be verified from the sandbox — the live network half (Tavily
+search + fool.com fetch) now has real evidence, not just untested code.
+
+**Scope boundary, stated directly:** `ingest_ticker.py` handles filings + transcript (the two real
+fetch-and-save steps) and resolves each ticker's real CIK from SEC's own data, printing the exact
+lines to paste into `fetch_xbrl_financials.py`'s `TICKER_TO_CIK` and `app/tools.py`'s
+`TICKER_TO_COMPANY`. It does not auto-edit either dict — both are small, static, hand-maintained, and
+imported directly into the live agent's per-query path (`get_fundamentals_health_score`, called on
+every chat turn); auto-mutating either under time pressure without a full test pass against that live
+path would trade a two-line manual edit for real risk to a tested, load-bearing piece of the app. Not
+done, deliberately.
+
+**`fetch_edgar_filings.py` also changed** while building this: refactored to expose
+`ingest_filings_for_ticker(ticker, cik_map)` so `ingest_ticker.py` doesn't duplicate that logic, and
+`TICKERS` now includes PANW/DELL (item 6, step 1 — done as a side effect of this work, not separately).
 
 ### Verified: there is currently no automation at all
 
@@ -430,3 +494,31 @@ already need to be tested against real new tickers anyway.
   on PANW" isn't mistaken for "works great on any ticker."
 - If price-target data turns out to be gated the same way FMP's historical prices were, that's a
   self-contained failure — it should not block demo-readiness on items 1–4.
+
+---
+
+## 7. Hybrid dense + BM25 retrieval (RRF) for `search_filings` [DO THIS IF WE HAVE TIME, after item 5]
+
+Scoped narrowly, on purpose — see the chat discussion this came out of. This is NOT about fusing
+`search_filings` and `search_filings_exact` together; those serve different guarantees (best-guess
+relevance vs. guaranteed-complete recall) and RRF-blending them would reintroduce the lossy top-k
+behavior `search_filings_exact` exists specifically to avoid. This is about making `search_filings`
+itself — currently pure dense/vector retrieval — a real hybrid retriever: dense + BM25 fused via
+Reciprocal Rank Fusion, the actual Session 07 pattern
+(`07_Advanced_Retrievers/01_Cat_Health_Advanced_Retrieval.ipynb`'s hand-rolled `reciprocal_rank_fusion()`
+feeding `hybrid_children_retrieve()`), same session that also supplies item 4's Cohere reranker
+precedent.
+
+### Key technical steps
+1. Add a BM25 retriever alongside the existing dense child-retriever in `test_q1.build_retriever` /
+   `parent_child_retriever.py`, over the same indexed child chunks.
+2. Port Session 07's `reciprocal_rank_fusion()` (or an equivalent) to fuse the two ranked lists before
+   parent-lookup/truncation.
+3. Re-run against the RAG-answerable eval questions (Q1 at minimum) to confirm this is a real
+   improvement, not just a different result — same "evaluation harness as hard evidence" standard
+   this project holds every other retrieval change to, not a checkbox.
+
+### Caveats / not yet considered
+- This only touches `search_filings`. `search_filings_exact` and item 4's reranker (a separate stage,
+  applied after retrieval) are both unaffected and stay as-is.
+- Sequenced after item 5 (onboarding form) per Maiu's call — not blocking any MUST-WORK-FOR-DEMO item.

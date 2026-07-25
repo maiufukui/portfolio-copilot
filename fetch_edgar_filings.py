@@ -15,6 +15,7 @@ Usage:
     python fetch_edgar_filings.py
 """
 
+import argparse
 import os
 import time
 
@@ -24,7 +25,12 @@ import requests
 USER_AGENT = "Portfolio Tracker Assistant maiu.fukui@gmail.com"
 HEADERS = {"User-Agent": USER_AGENT}
 
-TICKERS = ["MRVL", "AAPL", "ALAB", "NBIS"]
+# PANW/DELL added per item 6 (doc: "Add PANW and DELL to
+# fetch_edgar_filings.py's TICKERS list"). No CIK hardcoding needed
+# here -- get_cik_map() already looks these up dynamically from SEC's
+# own company_tickers.json, unlike fetch_xbrl_financials.py's separate
+# hand-maintained TICKER_TO_CIK dict (existing, already-flagged debt).
+TICKERS = ["MRVL", "AAPL", "ALAB", "NBIS", "PANW", "DELL"]
 
 # form_type -> how many of the most recent filings of that type to grab.
 # 4 years of 10-Ks, and enough 10-Qs to cover those same ~4 years (3/year typical).
@@ -84,34 +90,51 @@ def download_filing(cik_int, accession, primary_doc, dest_path):
     print(f"Saved {dest_path}  <-  {url}")
 
 
+def ingest_filings_for_ticker(ticker: str, cik_map: dict) -> bool:
+    """Single-ticker body, factored out of main()'s loop so
+    ingest_ticker.py (the item-3-step-5 "one function call, not three
+    remembered steps" entrypoint) can call this for exactly one new
+    ticker without needing its own copy of this logic. Returns True if
+    at least one filing was downloaded, False otherwise -- so a caller
+    orchestrating multiple ingestion steps can tell success from
+    failure without parsing print output.
+    """
+    cik = cik_map.get(ticker.upper())
+    if not cik:
+        print(f"!! Could not find CIK for {ticker}, skipping")
+        return False
+
+    ticker_dir = os.path.join(DATA_DIR, ticker)
+    os.makedirs(ticker_dir, exist_ok=True)
+
+    filings, cik_int = get_filings(cik, DOMESTIC_FORM_COUNTS)
+
+    if not filings:
+        print(f"{ticker}: no 10-K/10-Q/8-K found — trying 20-F/6-K (foreign private issuer)")
+        filings, cik_int = get_filings(cik, FOREIGN_FORM_COUNTS)
+
+    if not filings:
+        print(f"!! No filings found at all for {ticker}")
+        return False
+
+    for form, filing_date, accession, primary_doc in filings:
+        ext = os.path.splitext(primary_doc)[1] or ".htm"
+        filename = f"{form.replace('/', '-')}_{filing_date}{ext}"
+        dest_path = os.path.join(ticker_dir, filename)
+        download_filing(cik_int, accession, primary_doc, dest_path)
+        time.sleep(0.3)  # stay well under SEC's rate limits
+    return True
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ticker", help="Fetch just this one ticker instead of all of TICKERS.")
+    args = parser.parse_args()
+
     cik_map = get_cik_map()
-
-    for ticker in TICKERS:
-        cik = cik_map.get(ticker.upper())
-        if not cik:
-            print(f"!! Could not find CIK for {ticker}, skipping")
-            continue
-
-        ticker_dir = os.path.join(DATA_DIR, ticker)
-        os.makedirs(ticker_dir, exist_ok=True)
-
-        filings, cik_int = get_filings(cik, DOMESTIC_FORM_COUNTS)
-
-        if not filings:
-            print(f"{ticker}: no 10-K/10-Q/8-K found — trying 20-F/6-K (foreign private issuer)")
-            filings, cik_int = get_filings(cik, FOREIGN_FORM_COUNTS)
-
-        if not filings:
-            print(f"!! No filings found at all for {ticker}")
-            continue
-
-        for form, filing_date, accession, primary_doc in filings:
-            ext = os.path.splitext(primary_doc)[1] or ".htm"
-            filename = f"{form.replace('/', '-')}_{filing_date}{ext}"
-            dest_path = os.path.join(ticker_dir, filename)
-            download_filing(cik_int, accession, primary_doc, dest_path)
-            time.sleep(0.3)  # stay well under SEC's rate limits
+    targets = [args.ticker.upper()] if args.ticker else TICKERS
+    for ticker in targets:
+        ingest_filings_for_ticker(ticker, cik_map)
 
 
 if __name__ == "__main__":

@@ -78,3 +78,18 @@ This standard sits above, and does not replace, the tactical working agreements 
   change isn't the same as a fix that actually worked.
 - **Report status precisely**: state what's committed vs. not, tested vs. not, in the PRD vs.
   only in chat.
+- **State what's new vs. already done before handing over a command.** Never hand Maiu a command
+  without first confirming it isn't re-running work that's already complete. Real incident (2026-07-25):
+  `backfill_price_history.py` got PANW/DELL added to its ticker list, and the resulting "run it"
+  instruction silently re-backfilled 4 already-completed tickers along with the 2 new ones — real
+  wasted API calls and wall-clock time, not a hypothetical cost.
+- **Default to the narrowest scope on any script that loops over a list** (tickers, files,
+  questions, etc.) — a single new item, not a full re-run of the list — unless Maiu explicitly asks
+  for a full re-run. If a script doesn't support single-item scope yet, add that support in the same
+  edit that adds the new item, not after being asked. Every ingestion script in this repo
+  (`fetch_transcripts.py`, `fetch_edgar_filings.py`, `fetch_xbrl_financials.py`) supports a
+  `--ticker` flag for this reason — check for and follow that existing pattern before writing a new
+  script or editing an existing one.
+- **State expected time/cost before suggesting anything that hits a live API, triggers a deploy, or
+  otherwise takes real wall-clock time** — and say whether a narrower version would get the same
+  result. Maiu's time waiting on a command is a real cost, not a free variable.
