@@ -21,3 +21,11 @@ python-dotenv==1.1.0
 requests==2.32.3
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+# SQLAlchemy + psycopg -- app/db.py, imported by app/tools.py at import
+# time, so this is a hard runtime dependency of the deployed server, not
+# an optional extra. yfinance deliberately NOT included here: it's only
+# used by backfill_price_history.py, a one-time script that never runs
+# in production -- same "keep the deploy image lean" reasoning already
+# applied to ragas above.
+SQLAlchemy==2.0.51
+psycopg[binary]==3.3.4

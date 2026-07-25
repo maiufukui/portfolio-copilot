@@ -67,6 +67,8 @@ from test_q5 import CODE_LABELS, fetch_insider_transactions, within_window  # no
 from test_q7 import find_hits  # noqa: E402
 from test_q8 import fetch_recommendation_trends, format_recommendation_trends  # noqa: E402
 
+from app import db  # noqa: E402
+
 load_dotenv()
 
 FINNHUB_QUOTE_URL = "https://finnhub.io/api/v1/quote"
@@ -243,12 +245,92 @@ def fetch_next_earnings_date(ticker: str, api_key: str) -> str | None:
     return dated[0] if dated else None
 
 
+# Real bug, found live: a user asked "ALAB dropped 8% last week, should I
+# sell?" and the agent never actually answered the question -- it fell
+# back to reciting the deterministic health-score block and generic
+# supporting detail instead. Root cause, confirmed by reading this file,
+# not guessed: get_market_data's only price signal was fetch_quote's
+# Finnhub /quote call, which exposes exactly one number -- `dp`, percent
+# change TODAY. There was no tool anywhere that could confirm or deny a
+# claim about last week, last month, or any other lookback -- the model
+# had zero real data to ground an answer in, for that entire shape of
+# question. This is the same class of gap the PRD's NBIS test case
+# happened to catch (a described "12% drop" didn't match the real quote,
+# and the agent called that out) -- that worked only because the claim
+# was about TODAY, the one thing the tool could check. Anything else was
+# unverifiable by design.
+#
+# Finnhub's own /stock/candle endpoint is the obvious first choice for
+# historical price and was deliberately NOT used here: multiple free-tier
+# users report a hard "you don't have access to this resource" error on
+# US-stock candles (finnhub-io/Finnhub-API GitHub issues #546 and #349,
+# checked directly, not assumed) -- not something to build a live demo
+# feature on.
+#
+# FMP was the first fix attempted here (FMP_API_KEY was already sitting
+# in .env, unused) and was CONFIRMED GATED for real tickers once actually
+# tested live -- a 402 Payment Required on ALAB, not a hypothetical -- so
+# it never became a durable source of truth, and would have needed a live
+# key on every single call regardless.
+#
+# Current source: app/db.py's price_snapshots table (Render Postgres),
+# backed by two things instead of one live API call --
+#   1. backfill_price_history.py, a one-time yfinance pull of ~1 year of
+#      real daily closes per ticker, run once by hand and verified
+#      against a known source before anything depended on it.
+#   2. get_market_data below, which upserts today's Finnhub quote price
+#      into price_snapshots on every call -- the permanent, ongoing
+#      mechanism, zero new API calls.
+# No TTL cache needed here the way FMP's fetch_price_history had one --
+# this is a local DB read, not a rate-limited external call.
+def fetch_price_history(ticker: str, max_days: int = 90) -> list[dict] | None:
+    """Reads real historical daily closes for `ticker` from Postgres
+    (app/db.py's price_snapshots), newest-first -- same shape
+    compute_price_change_over already expects ({'date', 'close'}).
+    Returns None on any DB failure (e.g. DATABASE_URL unset, connection
+    drop) so callers degrade gracefully instead of crashing the agent
+    turn, same pattern every other optional data source in this file
+    follows.
+    """
+    try:
+        history = db.get_price_history(ticker, limit=max_days)
+    except Exception:
+        return None
+    return history or None
+
+
+def compute_price_change_over(history: list[dict], trading_days_ago: int) -> dict | None:
+    """Percent change from `trading_days_ago` trading days back to the most
+    recent close in `history` (expects newest-first, as fetch_price_history
+    returns it). Trading days, not calendar days -- 5 trading days is "last
+    week", 21 is "last month", matching how these questions actually get
+    asked, rather than a naive 7/30-calendar-day offset that could land on
+    a weekend with no trading data at all."""
+    if not history or len(history) <= trading_days_ago:
+        return None
+    latest, past = history[0], history[trading_days_ago]
+    latest_close, past_close = latest.get("close"), past.get("close")
+    if latest_close is None or past_close is None or past_close == 0:
+        return None
+    return {
+        "from_date": past.get("date"),
+        "to_date": latest.get("date"),
+        "from_close": past_close,
+        "to_close": latest_close,
+        "pct_change": round((latest_close - past_close) / past_close * 100, 2),
+    }
+
+
 # ------------------------------------------------------------- D4 ---
 @tool
 def get_market_data(ticker: str) -> str:
-    """Finnhub market data for a ticker: live quote (price + % change),
-    next scheduled earnings date, insider transactions (Form 3/4/5) in
-    the last 30 days, and institutional analyst recommendation trends
+    """Market data for a ticker: live quote (price + % change TODAY only),
+    price change over the last ~week and ~month (real historical closes
+    from Postgres -- use this to verify or refute any claim a question
+    makes about a price move over a period, e.g. "dropped 8% last week"
+    -- never take the user's stated percentage at face value), next
+    scheduled earnings date, insider transactions (Form 3/4/5) in the
+    last 30 days, and institutional analyst recommendation trends
     (current vs. prior period). Use for price/valuation questions,
     "when does X report next" questions, insider-selling questions, and
     analyst-rating questions.
@@ -265,6 +347,44 @@ def get_market_data(ticker: str) -> str:
             f"Quote: ${q['price']} ({q['change_pct']}% today), "
             f"prev close ${q['prev_close']}, day range ${q['day_low']}-${q['day_high']}"
         )
+
+        # The permanent self-snapshot mechanism (see fetch_price_history's
+        # comment above): every real get_market_data call writes today's
+        # price into price_snapshots, zero new API calls (reuses the quote
+        # already fetched above). This is what keeps price history current
+        # going forward, after backfill_price_history.py's one-time seed.
+        # Wrapped defensively -- a DB hiccup here must not break the quote
+        # the user is actually asking for; same "degrade gracefully"
+        # pattern as every other optional data source in this file.
+        if q.get("price") is not None:
+            try:
+                db.save_price_snapshot(ticker, datetime.now().date(), q["price"])
+            except Exception as e:
+                print(f"!! save_price_snapshot failed for {ticker}: {e}", file=sys.stderr)
+
+    # Historical price change (week/month) -- see the long comment above
+    # fetch_price_history for why this exists: get_market_data previously
+    # exposed ONLY today's %% change, so a question claiming a move over
+    # any other period (e.g. "dropped 8% last week") had no real data to
+    # be checked against at all.
+    history = fetch_price_history(ticker)
+    if history:
+        change_lines = []
+        for label, trading_days in (("~1 week", 5), ("~1 month", 21)):
+            change = compute_price_change_over(history, trading_days)
+            if change:
+                change_lines.append(
+                    f"  {label} ({change['from_date']} -> {change['to_date']}): "
+                    f"{change['pct_change']:+.2f}% (${change['from_close']} -> ${change['to_close']})"
+                )
+        parts.append(
+            "Price change over time (verify any claimed % move against this -- do not take the "
+            "user's stated number at face value):\n" + "\n".join(change_lines)
+            if change_lines
+            else "Price change over time: not enough historical data yet to compute."
+        )
+    else:
+        parts.append("Price change over time: unavailable (database read failed).")
 
     # Added for eval Q11 ("when does X report next, what should I watch
     # for") -- fetch_next_earnings_date already existed and was already

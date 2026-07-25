@@ -40,12 +40,18 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app import db
 from app.graph import ask, build_graph
 from app.tools import TICKER_TO_COMPANY, get_dashboard_data
 
 load_dotenv()
 
-REQUIRED_ENV_VARS = ["OPENAI_API_KEY", "TAVILY_API_KEY", "FINNHUB_API_KEY"]
+# DATABASE_URL added alongside the pre-existing three: price history
+# (app/tools.py's get_market_data) now depends on Postgres being
+# reachable, same hard-requirement status as the LLM/search/market-data
+# keys below -- a missing DATABASE_URL should fail loudly at startup,
+# not silently degrade every price-history answer in production.
+REQUIRED_ENV_VARS = ["OPENAI_API_KEY", "TAVILY_API_KEY", "FINNHUB_API_KEY", "DATABASE_URL"]
 
 
 def _check_env() -> None:
@@ -58,6 +64,13 @@ def _check_env() -> None:
 
 
 _check_env()
+
+# Create price_snapshots/health_score_history/user_memory/news_dedup if
+# they don't already exist -- safe to run on every boot (checkfirst=True
+# internally), so this is the "run once on startup" init step rather
+# than a separate manual migration step someone has to remember to run
+# against a fresh deploy.
+db.init_db()
 
 # Built once at import time, not per-request -- app/graph.py's build_graph()
 # constructs the LLM client, tool belt, and checkpointer. Rebuilding it on

@@ -125,7 +125,11 @@ disclosed", "any mentions of Y") -- top-k vector search can silently miss a hit,
 failure for these questions, not a minor gap.
 - search_live_news: live web/news search for what's happening right now. Filings tools are \
 static and cannot answer "what's the latest" -- always use this tool for that.
-- get_market_data: live quote, insider transactions, and analyst recommendation trends.
+- get_market_data: live quote (today's % change only), price change over the last ~week and ~month, \
+insider transactions, and analyst recommendation trends. ALWAYS call this when a question states or \
+implies a price move over any period (e.g. "dropped 8% last week", "up this month") -- check the \
+stated number against the real week/month change this tool returns before answering; never assume \
+the user's stated percentage is accurate.
 
 The user's current Fundamentals Health Score has already been computed from objective data \
 (XBRL revenue/margin, 8-K leadership disclosures, insider activity) and is given below, in a \
@@ -449,7 +453,10 @@ class TemporalComparisonQuestion(BaseModel):
         "or otherwise implies a before/after comparison against a PRIOR reference point (e.g. 'since "
         "I bought it', 'has this changed', 'is this still a good hold'). False if the question only "
         "asks what's notable/current within a recency window (e.g. 'this week', 'lately') without "
-        "comparing to a past state -- a time window is not the same as a before/after comparison."
+        "comparing to a past state -- a time window is not the same as a before/after comparison. "
+        "Also False for a reaction to a live price move asking for a forward decision (e.g. 'it just "
+        "dropped X%, should I sell?') -- that asks what the current data supports doing NEXT, not "
+        "whether anything has changed since a past reference point."
     )
 
 
@@ -464,6 +471,21 @@ class TemporalComparisonQuestion(BaseModel):
 # asks whether anything changed. Fixed with explicit few-shot examples
 # below, drawing the window-vs-comparison line directly instead of relying
 # on the one-line instruction alone.
+#
+# Second real report, same mechanism, ALL tickers: the live "{company} just
+# dropped {move_pct}% today, I'm nervous -- should I sell?" question (Q7)
+# was also getting misrouted here -- "should I sell" reads as adjacent to
+# "is this still a good hold" (already a True example below), so the
+# classifier over-generalized again. Once routed here, the answer is
+# structurally incapable of addressing "should I sell" at all -- this
+# composer's prompt never sees the question text by design (see comment
+# above TemporalComparisonQuestion), so a misroute doesn't just get the
+# tone wrong, it produces an answer that ignores what was actually asked,
+# every time, for every ticker. Added an explicit False example below for
+# this question shape, and a debug print in
+# _question_invites_temporal_comparison so the next real run shows the
+# classifier's actual verdict directly in stdout, instead of having to
+# infer it indirectly from the response's structure.
 _TEMPORAL_QUESTION_PROMPT = """Classify whether this question about a stock holding asks for a \
 comparison over time (since purchase, since a date, whether something has changed) rather than \
 asking only about current status or what's notable within a recency window.
@@ -482,7 +504,10 @@ margins, insider activity, or leadership?" -> True (explicit since-purchase comp
 - "When does Marvell report next, and what should I watch for based on its current Fundamentals \
 Health Score?" -> False (asks about current status and what to watch, not whether anything changed)
 - "Is Nebius still a good hold given what's happened since Q1?" -> True (implies a before/after \
-comparison)"""
+comparison)
+- "Astera Labs just dropped 8% today, I'm nervous -- should I sell?" -> False (asks what the current \
+data supports doing next, a forward decision -- not a claim that something has changed since a past \
+reference point)"""
 _temporal_question_llm = build_chat_llm(model="gpt-4.1-mini", temperature=0).with_structured_output(
     TemporalComparisonQuestion
 )
@@ -492,6 +517,11 @@ def _question_invites_temporal_comparison(question: str) -> bool:
     verdict = _temporal_question_llm.invoke(
         [("system", _TEMPORAL_QUESTION_PROMPT), ("human", question)]
     )
+    # Debug print, deliberate and permanent for now: the previous fix for
+    # Q9 (few-shot examples alone) could not be confirmed working or
+    # broken from response shape alone -- this makes the classifier's
+    # actual verdict visible directly in every real run's stdout.
+    print(f"[temporal-comparison classifier] {question!r} -> {verdict.invites_temporal_comparison}")
     return verdict.invites_temporal_comparison
 
 

@@ -14,3 +14,7 @@ ragas==0.2.15
 requests==2.32.3
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+SQLAlchemy==2.0.51
+psycopg[binary]==3.3.4
+yfinance==1.5.2
+pytest==9.1.1

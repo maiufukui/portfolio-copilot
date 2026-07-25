@@ -35,7 +35,14 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
-      - key: FMP_API_KEY
+      # Render Postgres -- required as of app/db.py. server.py's
+      # _check_env() fails the service at startup (SystemExit) if this
+      # is missing, same hard-requirement status as the three keys
+      # above. Replaces FMP_API_KEY, which is fully dead now (grepped:
+      # zero references left in app/tools.py outside a historical
+      # comment) -- FMP was confirmed gated (402 on ALAB) and never
+      # became the real price-history source; Postgres did.
+      - key: DATABASE_URL
         sync: false
       # Optional -- LangSmith tracing works without these too.
       - key: LANGSMITH_TRACING
