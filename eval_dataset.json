@@ -26,7 +26,11 @@
         {"ticker": "MRVL", "company": "Marvell", "metric": "this quarter's data center revenue growth", "reference": "Data center revenue was $1.8 billion (76% of total revenue), up 11% sequentially and 27% year-over-year, with growth achieved across optical interconnect, custom silicon, and switching products."},
         {"ticker": "MRVL", "company": "Marvell", "metric": "fiscal 2028 data center revenue growth guidance", "reference": "Fiscal 2028 data center revenue guidance of approximately 55% year-over-year growth, accelerating from fiscal 2027, driven by interconnect growth (1.6T scale-out demand plus scale-up/scale-across contributions), custom silicon revenue more than doubling, and continued Ethernet switching ramp."},
         {"ticker": "NBIS", "company": "Nebius", "metric": "this quarter's adjusted EBITDA margin change", "reference": "Nebius AI business adjusted EBITDA margin expanded to 45% in Q1 2026, up from 24% in Q4 2025, an improvement management attributed to strong revenue growth (Nebius AI revenue up 841% year-over-year, 82% quarter-over-quarter) driving operating leverage."},
-        {"ticker": "NBIS", "company": "Nebius", "metric": "next quarter's margin guidance", "reference": "Management guided fiscal Q2 2026 group adjusted EBITDA margin to step down sequentially from Q1 levels before returning to Q1 levels in Q3 and moving higher in Q4, driven by the timing of upfront investments (hiring, recent acquisitions, product development) landing before the back-end-weighted capacity and revenue they support comes online -- a timing dynamic, not a structural change, per CFO Dado Alonso."}
+        {"ticker": "NBIS", "company": "Nebius", "metric": "next quarter's margin guidance", "reference": "Management guided fiscal Q2 2026 group adjusted EBITDA margin to step down sequentially from Q1 levels before returning to Q1 levels in Q3 and moving higher in Q4, driven by the timing of upfront investments (hiring, recent acquisitions, product development) landing before the back-end-weighted capacity and revenue they support comes online -- a timing dynamic, not a structural change, per CFO Dado Alonso."},
+        {"ticker": "PANW", "company": "Palo Alto Networks", "metric": "this quarter's gross margin change", "reference": "Total gross margin for the quarter was 75.8%, including services gross margin of 75.1%; product gross margin was 78.8%, a 40 basis point improvement year over year, balanced by driving cloud-hosting efficiencies against the mix shift toward higher-growth SaaS offerings."},
+        {"ticker": "PANW", "company": "Palo Alto Networks", "metric": "fiscal Q4 2026 revenue and margin outlook", "reference": "Fiscal Q4 2026 guidance of $3.345 billion to $3.355 billion in revenue (about 32% growth); full fiscal-year 2026 operating margin guided to 28.9%-29.2%. Management cited acceleration in Q3 organic bookings growth, early M&A integration progress, and a strong Q4 pipeline as the basis for raising full-year guidance across NGS ARR, RPO, and revenue."},
+        {"ticker": "DELL", "company": "Dell Technologies", "metric": "this quarter's gross margin change", "reference": "Gross margin dollars increased 18% year over year to $6.8 billion; gross margin rate was 20.5%, slightly better than anticipated, reflecting a mix shift toward AI servers (AI revenue up more than 4x year over year) and improved profitability in storage."},
+        {"ticker": "DELL", "company": "Dell Technologies", "metric": "fiscal 2027 gross margin guidance", "reference": "Management guided FY2027 gross margin rate up year-over-year excluding AI mix impact, citing pricing actions to protect margin rates (already visible in the ISG segment, with CSG improvements beginning in Q1 and continuing through the year) amid a tight supply environment and rising input costs."}
       ]
     },
     {
@@ -102,7 +106,9 @@
       "test_cases": [
         {"ticker": "ALAB", "company": "Astera Labs", "move_pct": 8},
         {"ticker": "NBIS", "company": "Nebius", "move_pct": 12},
-        {"ticker": "MRVL", "company": "Marvell", "move_pct": 3}
+        {"ticker": "MRVL", "company": "Marvell", "move_pct": 3},
+        {"ticker": "PANW", "company": "Palo Alto Networks", "move_pct": 6},
+        {"ticker": "DELL", "company": "Dell Technologies", "move_pct": 9}
       ]
     },
     {

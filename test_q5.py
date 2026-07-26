@@ -25,7 +25,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_TICKERS = ["MRVL", "AAPL", "ALAB", "NBIS"]
+# PANW/DELL added (item 6) -- real bug caught during Maiu's review: this
+# stayed hardcoded at 4 tickers even after TICKER_TO_COMPANY (app/tools.py)
+# grew to 6, so Q4's portfolio-wide "is there any insider selling in my
+# holdings" check would have silently kept excluding both new tickers.
+# Same "one ticker list per script" debt as everywhere else in this repo,
+# not a new decision -- update alongside the others when a 7th lands.
+DEFAULT_TICKERS = ["MRVL", "AAPL", "ALAB", "NBIS", "PANW", "DELL"]
 
 # Common Form 4 transaction codes worth knowing:
 # S = open-market sale, P = open-market purchase, A = grant/award,

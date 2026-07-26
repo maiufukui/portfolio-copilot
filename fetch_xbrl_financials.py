@@ -67,11 +67,23 @@ def fetch_concept(cik: str, tag: str) -> list[dict] | None:
 
 
 def fetch_revenue(cik: str) -> tuple[str, list[dict]]:
+    # Real bug, found against PANW (2026-07-25): this used to return the
+    # first tag with ANY entries, not the first tag with USABLE quarterly
+    # entries. Companies tag revenue inconsistently -- PANW's "Revenues"
+    # tag had data, but none of it was quarter-shaped (likely annual/legacy
+    # entries only), so quarterly_series() downstream silently produced 0
+    # quarters and the loop never tried the next candidate tag, even though
+    # RevenueFromContractWithCustomerExcludingAssessedTax exists in
+    # REVENUE_TAGS specifically for this situation. Now checks that
+    # quarterly_series(entries) actually yields something before committing
+    # to a tag. Backward-compatible: for tickers where the first tag already
+    # had usable quarterly data (confirmed: ALAB, DELL), this changes
+    # nothing.
     for tag in REVENUE_TAGS:
         entries = fetch_concept(cik, tag)
-        if entries:
+        if entries and quarterly_series(entries):
             return tag, entries
-    raise ValueError(f"No revenue concept found for CIK {cik} -- tried {REVENUE_TAGS}")
+    raise ValueError(f"No revenue concept with usable quarterly data found for CIK {cik} -- tried {REVENUE_TAGS}")
 
 
 def derive_missing_q4(quarterly_by_end: dict[str, dict], entries: list[dict]) -> list[dict]:
