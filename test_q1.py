@@ -20,14 +20,16 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import re
 
 import tiktoken
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from langchain_community.document_loaders import (
-    BSHTMLLoader,
     PyMuPDFLoader,
     TextLoader,
 )
+from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
@@ -44,6 +46,37 @@ def _tiktoken_len(text: str) -> int:
     return len(tokens)
 
 
+# Real bug, found against Data/ALAB/10-Q_2026-05-06.htm (2026-07-25): every
+# SEC filing since ~2019 uses Inline XBRL, which embeds machine-readable tag
+# data alongside the visible filing text inside <ix:header>/<ix:hidden>
+# elements and other elements styled display:none -- none of it meant to be
+# read by a human viewing the rendered page. BSHTMLLoader's default
+# soup.get_text() doesn't respect CSS visibility, so that hidden tag soup
+# was getting pulled into the "visible" text right alongside real prose
+# (confirmed: this exact file's parsed Item 1 started with raw XBRL fact
+# IDs -- "alab-202603310001736297false2026Q1--12-311P7Yxbrli:shares..." --
+# instead of real business-description text). Replaces BSHTMLLoader with a
+# thin wrapper that strips this content before text extraction; everything
+# else (encoding, metadata shape) matches BSHTMLLoader's own behavior so
+# nothing downstream needs to change.
+_HIDDEN_TAG_NAMES = ("ix:header", "ix:hidden")
+_DISPLAY_NONE_RE = re.compile(r"display\s*:\s*none", re.IGNORECASE)
+
+
+def _load_filing_html(path: str) -> Document:
+    with open(path, encoding="utf-8") as f:
+        soup = BeautifulSoup(f, "html.parser")
+
+    for tag in soup.find_all(_HIDDEN_TAG_NAMES):
+        tag.decompose()
+    for tag in soup.find_all(style=_DISPLAY_NONE_RE):
+        tag.decompose()
+
+    text = soup.get_text()
+    title = str(soup.title.string) if soup.title else ""
+    return Document(page_content=text, metadata={"source": path, "title": title})
+
+
 def load_ticker_documents(ticker: str, data_dir: str = "Data"):
     """Load every .htm (SEC filing), .txt (transcript), and .pdf (transcript,
     if that's all we have) file for a given ticker."""
@@ -54,7 +87,7 @@ def load_ticker_documents(ticker: str, data_dir: str = "Data"):
     documents = []
 
     for path in glob.glob(os.path.join(ticker_dir, "*.htm")):
-        documents.extend(BSHTMLLoader(path).load())
+        documents.append(_load_filing_html(path))
 
     for path in glob.glob(os.path.join(ticker_dir, "*.txt")):
         documents.extend(TextLoader(path).load())
