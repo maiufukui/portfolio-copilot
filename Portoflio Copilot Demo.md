@@ -418,6 +418,45 @@ combined piece of work with a hard ordering, not two independent items.
 - This changes what the 3 RAG-answerable eval questions actually return — worth re-checking that the
   hand-written reference answers still hold up reasonably, not just that the RAGAS scores stay high.
 
+**Real data-quality bug found and fixed along the way (2026-07-25):** step 1's Cohere smoke test
+surfaced a garbled "Item 1" parent for ALAB (`10-Q_2026-05-06.htm`) -- raw Inline XBRL fact IDs
+instead of prose. Root cause: every SEC filing since ~2019 embeds machine-readable tag data inside
+`<ix:header>`/`<ix:hidden>` elements and `display:none`-styled elements, none meant to be read by a
+human; `BSHTMLLoader`'s default text extraction doesn't respect CSS visibility and was pulling all
+of it into the "visible" text. Fixed in `test_q1.py`'s `load_ticker_documents` (the one shared
+loader used by the live agent's `search_filings`/`search_filings_exact`, `run_eval.py`, and
+`parent_child_retriever.py`) by stripping these elements before text extraction. Verified across all
+44 filings, all 6 tickers, not just the one file that surfaced it: this wasn't ALAB-specific --
+every ticker was affected, corpus shrank ~10.5% overall (1.4M of 13.7M characters removed). Spot-
+checked that removed content is genuinely redundant (iXBRL's standard "shadow tagging" -- the same
+numeric facts also appear in the normally-rendered, still-present visible text) by confirming
+specific removed figures/phrases are still findable in the post-strip text -- not data loss.
+
+**Real regression found and fixed in the reranker itself (2026-07-25):** first live test of the new
+Cohere rerank against the actual case it needs to solve (ALAB, "this quarter's gross margin
+change") failed -- the reranker alone ranked a bare numeric table (Item 2, no narrative) #1 and,
+worse, a 10-K's ANNUAL MD&A section #2, which cited a different period's change in the OPPOSITE
+direction (a decline, "(70) bps," vs. the quarter's actual improvement) -- a confidently wrong
+answer, not just a weak one. Root cause: the reranker has no concept that "this quarter" means the
+10-Q, not the trailing fiscal year: that distinction only exists in metadata/dates, not in raw
+semantic similarity. Diagnosed by testing query reformulation before touching any retrieval code:
+anchoring the query to the exact period ("...for the fiscal quarter ended March 31, 2026...")
+eliminated the wrong-period match entirely and moved the correct transcript excerpt from #4 to
+#1/#2. Further tested whether a non-date-specific phrasing achieved the same fix (it did, equally
+well) before committing to it -- avoids requiring the agent to know each company's actual fiscal
+calendar (varies by ticker), which an exact-date instruction would have silently depended on.
+Fixed via `search_filings`'s tool docstring (`app/tools.py`) instructing the agent to phrase
+period-scoped queries as "...for the most recently reported quarter, not the full fiscal year"
+rather than adding retrieval-side date logic -- deliberately a prompt-based fix (Option A), not the
+deterministic per-query-type routing considered (Option B), since the added complexity of B isn't
+justified except for genuinely multi-period question shapes (Q3's "across last 4 earnings calls,"
+not yet built) -- see chat discussion for the full reasoning. **Not yet verified against the live
+agent** -- confirmed only via direct calls to `parent_child_retriever.build_parent_child_retriever`,
+which `search_filings` doesn't use yet (still on the flat baseline retriever, pending step 3 below).
+Also not yet deployed -- this changes a live tool's docstring in `app/tools.py`, so it needs a
+redeploy before it affects the running app, same as every other `app/tools.py`/`app/graph.py` change
+this session.
+
 ---
 
 ## 5. Simple onboarding form — 4 fields, no account type [DO THIS IF WE HAVE TIME]
@@ -475,6 +514,18 @@ already need to be tested against real new tickers anyway.
    test of whether that parametrization actually generalizes to tickers it's never seen, which is a
    meaningfully stronger claim for the deck than "works on the 4 tickers it was built against."
 
+**STATUS (2026-07-25): COMPLETE, live-verified for all 6 tickers.** Real bug found and fixed along
+the way: `fetch_xbrl_financials.py`'s `fetch_revenue()` was accepting the first revenue tag with ANY
+data instead of the first tag with usable quarterly data — PANW's `Revenues` tag had only
+annual/legacy entries, so revenue_growth and margin both silently showed `insufficient_data`. Fixed
+to require `quarterly_series(entries)` be non-empty before committing to a tag (falls through to
+`RevenueFromContractWithCustomerExcludingAssessedTax` otherwise). Re-verified live against PANW:
+revenue_growth now `intact` (35 quarters found), margin now `at_risk` (67.55% latest, down from a
+74.21% peak, 666bps cumulative compression). Note for demo narration: this GAAP margin figure is
+lower than the 75.8% PANW cited on its earnings call, because the call figure is non-GAAP — expected
+gap for this company, not a bug, but avoid citing both numbers back-to-back without noting which is
+which if asked about PANW's margin in the same demo session.
+
 ### Key technical steps — analyst estimates/price targets
 
 1. Identify a real free-tier source — Finnhub has a `/stock/price-target` endpoint; FMP has an
@@ -484,6 +535,20 @@ already need to be tested against real new tickers anyway.
    trends (`fetch_recommendation_trends`/`format_recommendation_trends` in `test_q8.py`) — reuse
    existing formatting conventions rather than inventing a new response shape.
 
+**STATUS (2026-07-25): NOT COMPLETED — blocked, both free-tier sources gated.** Tested live via
+`check_price_targets.py` against all 6 tickers:
+- Finnhub `/stock/price-target`: 403 "no access" on all 6/6 tickers (including AAPL) — not
+  available on the current plan at all, not ticker-specific.
+- FMP `/stable/price-target-summary`: 402 gated on 5/6 tickers (ALAB, MRVL, NBIS, PANW, DELL); PASS
+  only on AAPL, per the error body a per-symbol subscription gate, not general access — not usable
+  for the actual portfolio.
+- Analyst *rating* (buy/hold/sell consensus, Finnhub `/stock/recommendation`) is unaffected and
+  already working (Q6/Q8) — this only blocks the dollar price-target figure specifically.
+- **DECISION (2026-07-25, Maiu): hold, not paying for an upgrade right now.** Not an open question
+  pending a cost check anymore — deliberately deferred. Step 2 (wiring into `get_market_data`) will
+  not be started. Ticker-onboarding (this item's other half, below) is unaffected and still must be
+  fully completed.
+
 ### Caveats / not yet considered
 
 - **PANW and DELL are both large, long-public, heavily-covered companies** — likely to have *better*
@@ -492,8 +557,6 @@ already need to be tested against real new tickers anyway.
   newer tickers — Task 6's own findings already showed ALAB as the harder edge case (a 0.0
   context-recall outlier). Worth stating this precisely in the deck/validation story so "works great
   on PANW" isn't mistaken for "works great on any ticker."
-- If price-target data turns out to be gated the same way FMP's historical prices were, that's a
-  self-contained failure — it should not block demo-readiness on items 1–4.
 
 ---
 
@@ -522,3 +585,34 @@ precedent.
 - This only touches `search_filings`. `search_filings_exact` and item 4's reranker (a separate stage,
   applied after retrieval) are both unaffected and stay as-is.
 - Sequenced after item 5 (onboarding form) per Maiu's call — not blocking any MUST-WORK-FOR-DEMO item.
+
+---
+
+## 8. Improve Q1 eval correctness — added 2026-07-25, priority TBD (confirm with Maiu)
+
+Real run of `run_eval.py --question 1` against all 12 cases (2026-07-25, after fixing the
+per-ticker retriever-caching bug that was causing a 429): `faithfulness` averaged 0.9884 (strong —
+the model isn't hallucinating beyond its retrieved context), but `factual_correctness(mode=f1)`
+averaged only 0.4550, with several rows at or near 0.0 (two "this quarter's gross margin change"
+cases scored 0.29 and 0.00; a PANW "fiscal Q4 2026 revenue and margin outlook" case scored 1.0 on
+context_recall but 0.00 on factual_correctness). High faithfulness + low factual_correctness is a
+specific, diagnosable pattern: the model is being faithful to what it retrieved, but what it
+retrieved and/or how it's being compared against the written `reference` isn't matching on the
+actual facts. Not yet root-caused — candidates worth checking before assuming which one it is:
+retrieval missing the specific figure entirely (k=10 miss), the written `reference` answers stating
+facts in a different form/granularity than what's retrievable (a scoring-mismatch problem, not a
+retrieval problem — same failure shape Q5 hit earlier per its own deferred_reason notes), or
+`context_recall`'s per-row 0.0 cases (2 of 12 rows) pointing at genuine retrieval misses.
+
+### Key technical steps
+1. Re-run `run_eval.py --question 1 --verbose` and read the actual retrieved_contexts vs. reference
+   for the worst-scoring rows (the two 0.0 factual_correctness cases) before changing anything —
+   diagnose first, don't guess at a fix.
+2. Based on what's actually wrong, fix is either: a retrieval issue (k, chunking, embedding) — likely
+   overlaps with item 4's reranker work — or a reference/scoring-format issue specific to these
+   cases, independent of retrieval quality.
+
+### Caveats / not yet considered
+- Priority tag not yet set — Maiu flagged this needs fixing ("correctness should be better") but
+  hasn't said whether it's MUST-WORK-FOR-DEMO or lower. Confirm before this competes for time against
+  items 4/5/7.
