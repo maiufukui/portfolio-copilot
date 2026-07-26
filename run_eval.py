@@ -100,7 +100,15 @@ _retriever_cache: dict[str, object] = {}
 def _get_cached_retriever(ticker: str):
     if ticker not in _retriever_cache:
         documents = load_ticker_documents(ticker)
-        _retriever_cache[ticker] = build_parent_child_retriever(documents)
+        # cache_key=ticker (2026-07-26): persists embeddings to local disk
+        # (parent_child_retriever.EMBEDDING_CACHE_DIR) so a SECOND run of
+        # this script (or app/tools.py's live agent, which now uses the
+        # same cache_key) doesn't re-embed via OpenAI at all if nothing
+        # about this ticker's corpus/chunking changed since the last run.
+        # This process-local _retriever_cache above still matters too --
+        # it's what avoids re-hitting even the disk cache twice per
+        # process (Q1 has 2 test cases per ticker).
+        _retriever_cache[ticker] = build_parent_child_retriever(documents, cache_key=ticker)
     return _retriever_cache[ticker]
 
 

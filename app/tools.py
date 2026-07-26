@@ -143,7 +143,14 @@ def _get_retriever(ticker: str):
     # (test_q1.build_retriever). Returns a callable (retrieve(question,
     # k=5) -> list[Document]), not a LangChain retriever object -- see
     # search_filings below for the call-site shape this requires.
-    retriever = build_parent_child_retriever(_get_documents(ticker))
+    #
+    # cache_key=ticker (2026-07-26): shares the same on-disk embedding
+    # cache as run_eval.py -- if that script (or a prior server process)
+    # already embedded this ticker's current corpus, this process reuses
+    # those vectors instead of re-hitting OpenAI. This process's own
+    # _RETRIEVER_CACHE above still matters for repeat calls within one
+    # running server, same as before.
+    retriever = build_parent_child_retriever(_get_documents(ticker), cache_key=ticker)
     _bounded_cache_set(_RETRIEVER_CACHE, ticker, retriever)
     return retriever
 

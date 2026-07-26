@@ -5,3 +5,4 @@ __pycache__/
 .DS_Store
 Data/**/*_files/
 Data/**/*.html
+.embedding_cache/

@@ -63,7 +63,10 @@ side for the required before/after table.
 
 from __future__ import annotations
 
+import hashlib
+import os
 import re
+import shutil
 import time
 
 import tiktoken
@@ -72,11 +75,69 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from qdrant_client import QdrantClient
 from rank_bm25 import BM25Okapi
 
 CHILD_CHUNK_SIZE = 512
 CHILD_CHUNK_OVERLAP = 50
 CHILD_SEARCH_K = 15  # search wider than the final k, then dedupe down to unique parents
+EMBEDDING_MODEL = "text-embedding-3-small"
+
+# Persistent/shared embedding cache (added 2026-07-26). Root cause this
+# fixes: every separate process that calls build_parent_child_retriever
+# (run_eval.py, app/tools.py's live agent, one-off dev scripts) used to
+# call QdrantVectorStore.from_documents(..., location=":memory:"), which
+# re-embeds a ticker's ENTIRE corpus via OpenAI from scratch, every single
+# time, with zero persistence between runs. Two short-lived processes
+# embedding the same static corpus within the same rolling 1-minute window
+# is exactly what pushed real runs into OpenAI's embeddings TPM rate limit
+# (429) three separate times this project (see run_eval.py's per-process
+# _retriever_cache comment for the first incident; that fix only stopped
+# REDUNDANT embedding calls within one process, not across processes).
+#
+# Fix: cache_key (a ticker) makes build_parent_child_retriever persist its
+# child-chunk embeddings to a local on-disk Qdrant collection instead of
+# :memory:, keyed by a content fingerprint (see _child_docs_fingerprint) so
+# a genuinely changed corpus (new filing added, chunking logic edited)
+# still triggers a real rebuild rather than silently serving stale
+# embeddings. Without a cache_key, behavior is unchanged (in-memory, no
+# persistence) -- compare_retrievers.py and check_cohere_rerank.py call
+# this without one and don't need cross-process reuse.
+#
+# Disclosed limitation, not silently papered over: Qdrant's local
+# (path=) mode takes an exclusive file lock on that directory -- only ONE
+# process can have a given ticker's cache open at a time. If a second
+# process tries to open the same ticker's cache while the first still has
+# it (e.g. running run_eval.py against ALAB while the dev server is also
+# mid-request for ALAB), that second process cannot get the lock. Handled
+# by falling back to a one-off in-memory build for that process (see the
+# try/except in _load_or_build_vectorstore) rather than crashing --
+# correct, but that process pays a real OpenAI re-embed cost that one
+# time. Acceptable for this project's actual usage pattern (sequential
+# local dev/eval runs, not concurrent same-ticker traffic), not a fix for
+# true concurrent multi-process access -- that would need a real Qdrant
+# server (Docker) instead of local file mode, which is more
+# infrastructure than a capstone needs right now.
+#
+# This is LOCAL DISK persistence -- it solves the actual, observed pain
+# (repeated rate limits across separate local dev-script invocations). It
+# does NOT by itself solve cold-start re-embedding on Render after a
+# server restart/redeploy, because Render's paid plans (including
+# Starter) do NOT include a persistent filesystem automatically -- a
+# separate "Disk" resource must be explicitly attached to the service and
+# mounted at a specific path (confirmed directly against Render's own
+# docs, render.com/docs/disks, 2026-07-26; see chat for the full
+# citation). EMBEDDING_CACHE_DIR below is overridable via env var
+# specifically so that a Disk can be pointed at it later without a code
+# change -- but no Disk is attached yet, and doing so is a separate,
+# not-yet-taken action (would cost $0.25/GB/month and also disables
+# zero-downtime deploys on that service, per Render's docs). Tracked as a
+# follow-up, not done here.
+EMBEDDING_CACHE_DIR = os.environ.get(
+    "EMBEDDING_CACHE_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".embedding_cache", "qdrant"),
+)
+QDRANT_COLLECTION_NAME = "parent_child"
 
 # Item 4: replaces the retired prefer_source_suffixes hand-coded rule
 # (below, kept only in git history) with a real per-query Cohere rerank
@@ -328,9 +389,88 @@ def split_into_parents(documents: list[Document]) -> list[dict]:
     return parents
 
 
-def build_parent_child_retriever(documents: list[Document]):
+def _child_docs_fingerprint(child_docs: list[Document]) -> str:
+    """Content fingerprint over exactly what would be embedded --
+    catches a genuinely changed corpus (new/edited filing) OR a changed
+    splitting/chunking rule (different child_docs even from the same raw
+    documents), either of which must invalidate the cache. Sorted first
+    so load-order nondeterminism (e.g. filesystem glob order) can't cause
+    a spurious cache miss/rebuild for an unchanged corpus."""
+    hasher = hashlib.sha256()
+    hasher.update(EMBEDDING_MODEL.encode())
+    for doc in sorted(child_docs, key=lambda d: (d.metadata.get("parent_id", ""), d.page_content)):
+        hasher.update(doc.metadata.get("parent_id", "").encode())
+        hasher.update(doc.page_content.encode("utf-8", errors="ignore"))
+    return hasher.hexdigest()
+
+
+def _load_or_build_vectorstore(child_docs: list[Document], embedding_model: OpenAIEmbeddings, cache_key: str | None):
+    """No cache_key: original behavior, unchanged (in-memory, no
+    persistence, always re-embeds). With a cache_key: reuse an on-disk
+    Qdrant collection if its fingerprint matches this exact child_docs
+    content; otherwise rebuild and persist. Any failure (most likely:
+    another process already holds this ticker's on-disk lock -- see the
+    module docstring above) falls back to the original in-memory build
+    rather than crashing, so this is strictly additive."""
+    if cache_key is None:
+        return QdrantVectorStore.from_documents(
+            documents=child_docs, embedding=embedding_model, location=":memory:", collection_name="parent_child_eval"
+        )
+
+    fingerprint = _child_docs_fingerprint(child_docs)
+    collection_dir = os.path.join(EMBEDDING_CACHE_DIR, cache_key)
+    fingerprint_path = os.path.join(EMBEDDING_CACHE_DIR, f"{cache_key}.fingerprint")
+
+    try:
+        cached_fingerprint = None
+        if os.path.exists(fingerprint_path):
+            with open(fingerprint_path) as f:
+                cached_fingerprint = f.read().strip()
+
+        if cached_fingerprint == fingerprint and os.path.isdir(collection_dir):
+            client = QdrantClient(path=collection_dir)
+            if client.collection_exists(QDRANT_COLLECTION_NAME):
+                print(f"[embedding cache] HIT for {cache_key} -- reusing on-disk vectors, no OpenAI embedding calls made.")
+                return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION_NAME, embedding=embedding_model)
+            client.close()
+
+        # Cache miss (first time), or stale (corpus/chunking changed) --
+        # wipe any old collection dir before rebuilding so it can't mix
+        # old vectors with the new fingerprint file.
+        os.makedirs(EMBEDDING_CACHE_DIR, exist_ok=True)
+        if os.path.isdir(collection_dir):
+            shutil.rmtree(collection_dir)
+        print(f"[embedding cache] MISS for {cache_key} -- embedding via OpenAI and persisting to disk for next time.")
+        vectorstore = QdrantVectorStore.from_documents(
+            documents=child_docs,
+            embedding=embedding_model,
+            path=collection_dir,
+            collection_name=QDRANT_COLLECTION_NAME,
+        )
+        with open(fingerprint_path, "w") as f:
+            f.write(fingerprint)
+        return vectorstore
+    except Exception as e:  # noqa: BLE001 -- e.g. another process holds this ticker's on-disk lock right now
+        print(
+            f"!! WARNING: on-disk embedding cache unavailable for {cache_key} ({e}) -- "
+            f"falling back to an in-memory build for this process (will re-embed via OpenAI). "
+            f"Common cause: another process already has this ticker's cache directory open "
+            f"(Qdrant local file mode allows only one process at a time per collection)."
+        )
+        return QdrantVectorStore.from_documents(
+            documents=child_docs, embedding=embedding_model, location=":memory:", collection_name="parent_child_eval"
+        )
+
+
+def build_parent_child_retriever(documents: list[Document], cache_key: str | None = None):
     """Build a parent-child retriever over a ticker's already-loaded
     documents (see test_q1.load_ticker_documents).
+
+    cache_key: pass the ticker (e.g. "ALAB") to persist/reuse this
+    ticker's child-chunk embeddings on local disk across separate process
+    runs -- see the EMBEDDING_CACHE_DIR block above for why this exists
+    and its disclosed limitations. Omit it (default) for the original
+    in-memory, no-persistence behavior.
 
     Returns a callable: query(question: str, k: int = 5) -> list[Document],
     each returned Document being a full parent (Item / speaker turn / PDF
@@ -351,13 +491,8 @@ def build_parent_child_retriever(documents: list[Document]):
                 )
             )
 
-    embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
-    vectorstore = QdrantVectorStore.from_documents(
-        documents=child_docs,
-        embedding=embedding_model,
-        location=":memory:",
-        collection_name="parent_child_eval",
-    )
+    embedding_model = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    vectorstore = _load_or_build_vectorstore(child_docs, embedding_model, cache_key)
     child_retriever = vectorstore.as_retriever(search_kwargs={"k": CHILD_SEARCH_K})
 
     def _bounded_parent_text(parent_text: str, matched_child_text: str) -> str:
