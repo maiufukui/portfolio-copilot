@@ -58,7 +58,8 @@ from ragas.dataset_schema import SingleTurnSample
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import FactualCorrectness, Faithfulness, LLMContextRecall
 
-from test_q1 import build_retriever, load_ticker_documents
+from parent_child_retriever import build_parent_child_retriever
+from test_q1 import load_ticker_documents
 from test_q7 import count_raw_hits_by_keyword, dedupe_hits, find_hits, format_grouped_hits, format_single_hit, SUMMARY_PROMPT
 
 from langchain_core.output_parsers import StrOutputParser
@@ -75,6 +76,32 @@ answer_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 def load_dataset() -> dict:
     with open(DATASET_PATH) as f:
         return json.load(f)
+
+
+# Per-ticker retriever cache, scoped to a single run_eval.py process. Q1 now
+# has 2 test cases per ticker (8 -> 12 once PANW/DELL were added), and
+# run_rag_q1 was calling build_retriever (full re-embed of that ticker's
+# documents via text-embedding-3-small, no persistence) once per TEST CASE,
+# not once per ticker -- so every ticker's corpus was being embedded twice in
+# one run. That redundant 2x is what pushed a real run into OpenAI's
+# embeddings TPM rate limit (429) for the first time after the new test
+# cases were added. Cached only for the lifetime of this process (matches
+# the underlying retriever's own in-memory/ephemeral design, doesn't add a
+# new persistence layer or change what's tested).
+#
+# Item 4 (2026-07-25): swapped build_retriever (flat baseline) for
+# build_parent_child_retriever -- this eval was silently still scoring the
+# retired retriever after app/tools.py's search_filings moved to the new
+# parent-child + Cohere rerank one. Without this, Q1's RAGAS scores would
+# measure a retriever the live agent no longer uses.
+_retriever_cache: dict[str, object] = {}
+
+
+def _get_cached_retriever(ticker: str):
+    if ticker not in _retriever_cache:
+        documents = load_ticker_documents(ticker)
+        _retriever_cache[ticker] = build_parent_child_retriever(documents)
+    return _retriever_cache[ticker]
 
 
 # ---------------------------------------------------------------------------
@@ -111,10 +138,9 @@ def run_rag_q1(case: dict) -> dict:
     a product concept, so this no longer uses test_q1.py's original
     Verdict/Evidence/Explanation prompt, only its generic load/retrieve
     utilities."""
-    documents = load_ticker_documents(case["ticker"])
-    retriever = build_retriever(documents)
-    query = f"What did {case['ticker']}'s management identify as the specific driver behind {case['metric']}?"
-    retrieved_docs = retriever.invoke(query)
+    retriever = _get_cached_retriever(case["ticker"])
+    query = f"What did {case['ticker']}'s management identify as the specific driver behind {case['metric']}, for the most recently reported quarter, not the full fiscal year?"
+    retrieved_docs = retriever(query, k=5)
     contexts = [d.page_content for d in retrieved_docs]
 
     chain = Q1_DRIVER_PROMPT | answer_llm | StrOutputParser()

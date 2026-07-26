@@ -35,6 +35,16 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
+      # Item 4: parent-child reranker (app/tools.py's search_filings ->
+      # parent_child_retriever -> langchain_cohere.CohereRerank). Free
+      # trial tier (1,000 calls/mo) confirmed live 2026-07-25 -- see
+      # check_cohere_rerank.py. Not a hard startup requirement the way
+      # DATABASE_URL is -- retrieve() catches a missing/failing Cohere
+      # call and falls back to a local BM25 rerank -- but required for
+      # search_filings to actually use the reranker instead of silently
+      # degrading to the fallback on every call.
+      - key: COHERE_API_KEY
+        sync: false
       # Render Postgres -- required as of app/db.py. server.py's
       # _check_env() fails the service at startup (SystemExit) if this
       # is missing, same hard-requirement status as the three keys

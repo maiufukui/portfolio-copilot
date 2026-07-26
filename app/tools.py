@@ -61,7 +61,8 @@ from fetch_xbrl_financials import (  # noqa: E402
     fetch_revenue,
     quarterly_series,
 )
-from test_q1 import build_retriever, load_ticker_documents  # noqa: E402
+from parent_child_retriever import build_parent_child_retriever  # noqa: E402
+from test_q1 import load_ticker_documents  # noqa: E402
 from test_q2 import format_results, search_tavily  # noqa: E402
 from test_q5 import CODE_LABELS, fetch_insider_transactions, within_window  # noqa: E402
 from test_q7 import find_hits  # noqa: E402
@@ -138,7 +139,11 @@ def _get_retriever(ticker: str):
         _RETRIEVER_CACHE.move_to_end(ticker)
         return _RETRIEVER_CACHE[ticker]
     cache_stats["retriever_misses"] += 1
-    retriever = build_retriever(_get_documents(ticker))
+    # Item 4: parent-child + Cohere rerank, replacing the flat baseline
+    # (test_q1.build_retriever). Returns a callable (retrieve(question,
+    # k=5) -> list[Document]), not a LangChain retriever object -- see
+    # search_filings below for the call-site shape this requires.
+    retriever = build_parent_child_retriever(_get_documents(ticker))
     _bounded_cache_set(_RETRIEVER_CACHE, ticker, retriever)
     return retriever
 
@@ -153,9 +158,21 @@ def search_filings(ticker: str, query: str) -> str:
     questions that need exhaustive/verbatim recall of every mention of
     a term (top-k similarity search can silently miss hits) -- use
     search_filings_exact for those instead.
+
+    For a question scoped to a specific recent period ("this quarter",
+    "latest", "recent"), phrase your query to explicitly ask for the
+    MOST RECENTLY REPORTED QUARTER, distinguishing it from the full
+    fiscal year -- e.g. "...for the most recently reported quarter, not
+    the full fiscal year." Do not try to guess or state an exact date;
+    you likely don't know this company's specific fiscal calendar, and
+    the phrasing above works without one. Confirmed necessary against a
+    real case (item 4, 2026-07-25): without this, a 10-K's annual MD&A
+    section -- a different period, sometimes citing a change in the
+    opposite direction from the actual quarter -- outranked the correct
+    quarterly source.
     """
     retriever = _get_retriever(ticker)
-    docs = retriever.invoke(query)
+    docs = retriever(query, k=5)
     if not docs:
         return f"No relevant passages found in {ticker}'s indexed filings for: {query}"
     parts = []

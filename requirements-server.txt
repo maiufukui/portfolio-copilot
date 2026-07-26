@@ -29,3 +29,8 @@ uvicorn[standard]==0.34.0
 # applied to ragas above.
 SQLAlchemy==2.0.51
 psycopg[binary]==3.3.4
+# langchain-cohere + rank-bm25 -- item 4's parent-child reranker, now a
+# hard runtime dependency: app/tools.py's search_filings imports
+# parent_child_retriever, which imports both at module load time.
+langchain-cohere==0.4.6
+rank-bm25==0.2.2

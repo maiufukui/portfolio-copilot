@@ -64,16 +64,28 @@ side for the required before/after table.
 from __future__ import annotations
 
 import re
+import time
 
 import tiktoken
+from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from rank_bm25 import BM25Okapi
 
 CHILD_CHUNK_SIZE = 512
 CHILD_CHUNK_OVERLAP = 50
 CHILD_SEARCH_K = 15  # search wider than the final k, then dedupe down to unique parents
+
+# Item 4: replaces the retired prefer_source_suffixes hand-coded rule
+# (below, kept only in git history) with a real per-query Cohere rerank
+# pass -- same langchain_cohere.CohereRerank pattern verified working
+# against this project's real data via check_cohere_rerank.py, itself
+# following Session 07's rerank_parent_candidates.
+RERANK_MODEL = "rerank-v3.5"
+RERANK_MAX_RETRIES = 1  # one retry on a transient failure before falling back -- most
+                          # real-world 429s/network blips clear within a second
 
 # Bound on how much of one parent's raw text gets returned. Confirmed
 # necessary against the eval harness's own Q1 case 1 ("this quarter's
@@ -369,30 +381,15 @@ def build_parent_child_retriever(documents: list[Document]):
         suffix = " [...truncated...]" if end < len(parent_text) else ""
         return prefix + parent_text[start:end] + suffix
 
-    def retrieve(question: str, k: int = 5, prefer_source_suffixes: tuple[str, ...] | None = None) -> list[Document]:
-        """prefer_source_suffixes, if given (e.g. (".txt", ".pdf") for
-        transcript-format sources), moves any deduped candidate parent
-        whose source file ends with one of these suffixes ahead of the
-        rest, before truncating to k -- each group otherwise keeps its
-        original similarity-rank order.
-
-        Opt-in and unused by default -- this is NOT a general "transcripts
-        outrank filings" rule (a query about risk factors should still
-        prefer 10-K content). It exists for driver-identification-style
-        questions ("what did management identify/say..."), where the
-        primary source for management's own narrative attribution is the
-        earnings call transcript, not a filing's required GAAP-comparison
-        language, which technically answers a similar-sounding question
-        with a different, differently-scoped number. Confirmed necessary
-        against eval_dataset.json Q1 case 1 ("this quarter's gross margin
-        change"): similarity search already ranked the correct transcript
-        excerpt among the top candidates (verified via
-        inspect_retrieval.py), and bounding context size alone (see
-        MAX_PARENT_CHARS) didn't change which one the response used --
-        the synthesis step was anchoring on whichever source appeared
-        first in the concatenated context, so re-ordering by source type,
-        for this specific question shape, is the more direct fix. See
-        compare_retrievers.py for where it's applied."""
+    def retrieve(question: str, k: int = 5) -> list[Document]:
+        """Search child chunks, dedupe back to unique parents (Item
+        sections / speaker turns / PDF pages), then rank those parents
+        against the actual query with Cohere Rerank -- replaces the
+        retired prefer_source_suffixes hand-coded rule (see git history),
+        which only reordered by source-file type and was, in the PRD's
+        own words, "set by hand for one known question" (Q1 case 1,
+        ALAB's gross-margin driver). This generalizes past that one case
+        instead of encoding it."""
         child_hits = child_retriever.invoke(question)
         seen: set[str] = set()
         candidates = []
@@ -409,11 +406,49 @@ def build_parent_child_retriever(documents: list[Document]):
                 )
             )
 
-        if prefer_source_suffixes:
-            preferred = [d for d in candidates if d.metadata["source"].endswith(prefer_source_suffixes)]
-            other = [d for d in candidates if not d.metadata["source"].endswith(prefer_source_suffixes)]
-            candidates = preferred + other
-
-        return candidates[:k]
+        return _rerank(question, candidates, k)
 
     return retrieve
+
+
+def _bm25_fallback_rerank(question: str, candidates: list[Document], k: int) -> list[Document]:
+    """Free, local, no-network reranking fallback -- the same rank_bm25
+    library Session 07's own notebook uses for lexical retrieval,
+    repurposed here as a fallback SCORER over an already-retrieved
+    candidate set rather than a first-stage retriever. Used only when
+    Cohere is unavailable, so search_filings still returns
+    relevance-ranked results during a Cohere outage instead of silently
+    reverting to raw similarity order -- the exact ranking behavior
+    already found broken on a real case (ALAB's gross-margin question,
+    see retrieve()'s docstring)."""
+    tokenized_corpus = [doc.page_content.lower().split() for doc in candidates]
+    bm25 = BM25Okapi(tokenized_corpus)
+    scores = bm25.get_scores(question.lower().split())
+    ranked = sorted(zip(candidates, scores), key=lambda pair: pair[1], reverse=True)
+    return [doc for doc, _ in ranked[:k]]
+
+
+def _rerank(question: str, candidates: list[Document], k: int) -> list[Document]:
+    """Cohere Rerank as the primary ranking signal. One retry on failure
+    (network blip, rate limit) before falling back to a local BM25
+    rerank (_bm25_fallback_rerank) rather than raw similarity order --
+    fails open (search_filings still returns something) but doesn't
+    silently regress to the pre-item-4 ranking quality. Any Cohere/
+    network exception is caught here, not raised, so one flaky rerank
+    call can't take down the whole tool."""
+    if not candidates:
+        return candidates
+    compressor = CohereRerank(model=RERANK_MODEL, top_n=k)
+    last_error: Exception | None = None
+    for attempt in range(RERANK_MAX_RETRIES + 1):
+        try:
+            return list(compressor.compress_documents(documents=candidates, query=question))
+        except Exception as e:  # noqa: BLE001 -- any failure here falls back, doesn't crash the tool
+            last_error = e
+            if attempt < RERANK_MAX_RETRIES:
+                time.sleep(1)
+    print(
+        f"!! WARNING: Cohere rerank failed after {RERANK_MAX_RETRIES + 1} attempt(s) "
+        f"({last_error}) -- falling back to local BM25 rerank for this query."
+    )
+    return _bm25_fallback_rerank(question, candidates, k)

@@ -181,25 +181,16 @@ def main():
                 run_case(c, lambda q: [d.page_content for d in baseline_retriever.invoke(q)])
             )
 
-        print(f"Running parent-child retriever against {ticker}'s case(s)...")
-        # prefer_source_suffixes=(".txt", ".pdf"): Q1 is a driver-identification
-        # question ("what did management identify/say..."), and the primary
-        # source for management's own narrative attribution is the earnings
-        # call transcript, not a filing's required GAAP-comparison language --
-        # see parent_child_retriever.retrieve's docstring for the full
-        # rationale and the eval evidence (Q1 case 1, ALAB) behind it. Applied
-        # uniformly across all 4 tickers here since it targets the QUESTION
-        # SHAPE (driver identification), not one ticker's data specifically --
-        # whether it holds up outside ALAB is itself part of what widening
-        # this comparison to 8 cases is meant to test, not assumed in advance.
+        print(f"Running parent-child retriever (with Cohere rerank) against {ticker}'s case(s)...")
+        # Item 4: parent_child_retrieve now reranks internally via Cohere
+        # (parent_child_retriever._rerank), replacing the retired
+        # prefer_source_suffixes hand-coded rule that used to be passed
+        # here -- see parent_child_retriever.retrieve's docstring.
         for c in cases:
             pc_results.append(
                 run_case(
                     c,
-                    lambda q: [
-                        d.page_content
-                        for d in parent_child_retrieve(q, k=5, prefer_source_suffixes=(".txt", ".pdf"))
-                    ],
+                    lambda q: [d.page_content for d in parent_child_retrieve(q, k=5)],
                 )
             )
 

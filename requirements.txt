@@ -18,3 +18,5 @@ SQLAlchemy==2.0.51
 psycopg[binary]==3.3.4
 yfinance==1.5.2
 pytest==9.1.1
+langchain-cohere==0.4.6
+rank-bm25==0.2.2
