@@ -23,6 +23,52 @@ function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Fixed 2026-07-27 (UI audit): the old version only ever read `reason`,
+// which app/tools.py only sets when NO 8-K Item 5.02 was found at all --
+// the moment a real departure filing exists, the backend sends
+// `departures` instead, and the old code silently fell through to "No
+// data available," misrepresenting a ticker that actually has real
+// departure data as having none.
+function describeLeadership(
+  signal:
+    | {
+        reason?: string;
+        departures?: {
+          status: string;
+          is_ceo_or_cfo?: boolean;
+          successor_named?: boolean;
+          filed?: string;
+          reason?: string;
+        }[];
+      }
+    | undefined
+): string {
+  if (typeof signal?.reason === "string") return capitalize(signal.reason);
+
+  const departures = signal?.departures;
+  if (!departures || departures.length === 0) return "No data available.";
+
+  const real = departures.filter((d) => d.status !== "intact");
+  if (real.length === 0) {
+    return "8-K Item 5.02 filing(s) found in last 90 days; none indicated an actual departure.";
+  }
+
+  const ceoOrCfo = real.some((d) => d.is_ceo_or_cfo);
+  const successorNamed = real.some((d) => d.successor_named);
+  const latestFiled = real
+    .map((d) => d.filed)
+    .filter((f): f is string => Boolean(f))
+    .sort()
+    .at(-1);
+
+  return (
+    `${real.length} departure${real.length === 1 ? "" : "s"} reported in last 90 days` +
+    (ceoOrCfo ? " (CEO/CFO level)" : "") +
+    (successorNamed ? ", successor named" : "") +
+    (latestFiled ? ` -- filed ${latestFiled}.` : ".")
+  );
+}
+
 // Real prices (from the same quote data already fetched for the ticker
 // cards) times real, persisted share counts (GET /holdings, app/db.py's
 // holdings table -- 2026-07-27, replacing the old lib/mock-holdings.ts).
@@ -96,9 +142,14 @@ function PortfolioValue({
   );
 }
 
-// One row per signal: label + status chip fixed on the left, trend chart
-// or qualitative text filling the right side of the same row -- vertical
-// stack rather than a 4-column grid, per Maiu (2026-07-27).
+// Three explicit grid columns (dimension / status / trend-detail), not a
+// flex block sharing one narrow width between label and pill -- widened
+// 2026-07-27 (Maiu: "looks squished," fair -- label+pill were previously
+// crammed into a single 160px flex block together, and the 3rd column had
+// far more room than it needed while the first two were tight). Fixed
+// pixel widths for columns 1/2 keep every row's label and pill aligned
+// vertically down the list; column 3 still gets the large majority of the
+// row via 1fr.
 function SignalRow({
   label,
   status,
@@ -109,12 +160,36 @@ function SignalRow({
   right: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 border-b border-border py-3 first:pt-0 last:border-b-0 last:pb-0">
-      <div className="flex w-40 shrink-0 items-center justify-between gap-2">
-        <span className="text-sm font-medium">{label}</span>
-        <HealthPill status={status} size="sm" />
+    <div className="grid grid-cols-[180px_112px_1fr] items-center gap-6 border-b border-border py-3 first:pt-0 last:border-b-0 last:pb-0">
+      <span className="text-sm font-medium">{label}</span>
+      <HealthPill status={status} size="sm" />
+      <div className="min-w-0">{right}</div>
+    </div>
+  );
+}
+
+// Bold current-quarter figure + compact sparkline, the standard
+// current-value-plus-trend pairing (Apple Stocks, Robinhood, etc.) --
+// replaces the old approach of floating a value label above every point,
+// which got noisy/oversized once the chart's own bug (see
+// mini-line-chart.tsx's header comment) was fixed and the chart shrank
+// back down to its intended size.
+function TrendCell({
+  points,
+  color,
+}: {
+  points: { label: string; value: number }[];
+  color?: string;
+}) {
+  const latest = points.at(-1);
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-14 shrink-0 font-heading text-base font-semibold">
+        {latest ? `${latest.value.toFixed(1)}%` : "—"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <MiniLineChart points={points} color={color} />
       </div>
-      <div className="min-w-0 flex-1">{right}</div>
     </div>
   );
 }
@@ -257,14 +332,22 @@ export function Dashboard({
             </CardHeader>
             <CardContent className="flex flex-col">
               <SignalRow
-                label="Revenue (YoY)"
+                label="Revenue Growth (QoQ)"
                 status={revenueSignal?.status ?? "insufficient_data"}
                 right={
-                  <MiniLineChart
+                  <TrendCell
                     points={
-                      revenueSignal?.yoy_growth_by_quarter?.map((q) => ({
+                      // qoq_growth_chart, not yoy_growth_by_quarter (switched
+                      // 2026-07-27, Maiu) -- the status pill above is itself
+                      // QoQ-based (classify_revenue_trend's streak), so the
+                      // chart now matches what's actually driving the status
+                      // instead of showing a different (YoY) metric next to
+                      // it. ~2 years of quarters, independent of the 3-delta
+                      // window the status calc reads -- see
+                      // fetch_xbrl_financials.py.
+                      revenueSignal?.qoq_growth_chart?.map((q) => ({
                         label: q.period.slice(2, 7),
-                        value: q.yoy_pct ?? 0,
+                        value: q.qoq_pct ?? 0,
                       })) ?? []
                     }
                   />
@@ -274,7 +357,7 @@ export function Dashboard({
                 label="Margin"
                 status={marginSignal?.status ?? "insufficient_data"}
                 right={
-                  <MiniLineChart
+                  <TrendCell
                     points={
                       marginSignal?.margin_by_quarter?.map((q) => ({
                         label: q.period.slice(2, 7),
@@ -289,11 +372,7 @@ export function Dashboard({
                 label="Leadership Change"
                 status={leadershipSignal?.status ?? "insufficient_data"}
                 right={
-                  <p className="text-xs text-muted-foreground">
-                    {typeof leadershipSignal?.reason === "string"
-                      ? capitalize(leadershipSignal.reason)
-                      : "No data available."}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{describeLeadership(leadershipSignal)}</p>
                 }
               />
               <SignalRow

@@ -462,7 +462,7 @@ export default function PortfolioPage() {
           )}
         </div>
 
-        <div className="flex h-[45vh] min-h-[320px] flex-col border-t lg:h-auto lg:w-[24%] lg:min-w-[300px] lg:border-t-0 lg:border-l">
+        <div className="flex h-[45vh] min-h-[320px] flex-col border-t lg:h-auto lg:w-[28%] lg:min-w-[340px] lg:border-t-0 lg:border-l">
           <div className="border-b bg-background px-4 py-3">
             <p className="font-heading text-base font-semibold">Ask North</p>
             <p className="text-xs text-muted-foreground">

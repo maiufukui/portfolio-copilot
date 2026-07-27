@@ -15,6 +15,7 @@ export interface ChatApiResponse {
 export interface QuarterPoint {
   period: string;
   yoy_pct?: number;
+  qoq_pct?: number;
   margin_pct?: number;
   compared_to?: string;
 }
@@ -28,9 +29,33 @@ export interface HealthScore {
   ticker: string;
   overall: HealthSignal["status"];
   signals: {
-    revenue_growth?: HealthSignal & { yoy_growth_by_quarter?: QuarterPoint[] };
+    revenue_growth?: HealthSignal & {
+      yoy_growth_by_quarter?: QuarterPoint[];
+      // Separate, wider (~2yr) QoQ series for the chart -- independent of
+      // whatever window the status calc actually reads (backend,
+      // 2026-07-27). See fetch_xbrl_financials.py's classify_revenue_trend.
+      qoq_growth_chart?: QuarterPoint[];
+    };
     margin?: HealthSignal & { margin_by_quarter?: QuarterPoint[] };
-    leadership?: HealthSignal & { reason?: string };
+    leadership?: HealthSignal & {
+      // Only present when NO 8-K Item 5.02 was found at all (app/tools.py:
+      // signals["leadership"] = {"status": "intact", "reason": "..."}).
+      reason?: string;
+      // Present instead of `reason` whenever a real 8-K Item 5.02 WAS
+      // found -- one entry per matched filing (app/tools.py:
+      // signals["leadership"] = {"status": overall, "departures": results}).
+      // A UI that only reads `reason` and falls back to "no data" when
+      // it's missing would incorrectly call this "no data" instead of
+      // describing the real departure(s) -- found in a 2026-07-27 audit,
+      // fixed in dashboard.tsx.
+      departures?: {
+        status: HealthSignal["status"];
+        is_ceo_or_cfo?: boolean;
+        successor_named?: boolean;
+        filed?: string;
+        reason?: string;
+      }[];
+    };
     insider_activity?: HealthSignal & {
       total_sell_value_30d?: number;
       distinct_sellers_30d?: number;

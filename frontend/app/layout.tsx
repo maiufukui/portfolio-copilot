@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
 
 // Inter -- a modern, geometric sans used across most current AI-product
@@ -14,14 +14,19 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-// Fraunces -- free Google Fonts substitute for the brand spec's "Editorial
-// New" (a commercial font we don't have a license for). Used only for
-// hero numbers/headlines (portfolio value, prices, large metrics) via
-// --font-heading in globals.css -- everything else (nav, tables, body,
-// chat, buttons) stays on Inter, matching the spec's split between the
-// two typefaces.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Newsreader -- free Google Fonts substitute for the brand spec's
+// "Editorial New" (a commercial font we don't have a license for). Swapped
+// in 2026-07-27 for Fraunces, which read too quirky/idiosyncratic at
+// display size for a "quiet, premium, trustworthy" brand (Fraunces' ink
+// traps and wonky-by-default optical-size personality is a deliberate
+// design choice for that font, just not this one). Newsreader is a
+// transitional serif built specifically for long-form reading UI (closer
+// in spirit to the FT/NYT register the brand doc names) -- calmer,
+// higher x-height, no quirky detailing. Used only for hero numbers/
+// headlines (portfolio value, prices, large metrics) via --font-heading
+// in globals.css -- everything else stays on Inter.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
   weight: ["500", "600"],
 });
@@ -37,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${newsreader.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
