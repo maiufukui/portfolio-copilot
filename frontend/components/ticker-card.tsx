@@ -5,14 +5,27 @@ import { HealthPill } from "@/components/health-pill";
 import { cn } from "@/lib/utils";
 import type { DashboardData } from "@/lib/api";
 
+function formatMoney(n: number): string {
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  });
+}
+
 export function TickerCard({
   data,
   isSelected,
   onSelect,
+  // Real price x real, persisted share count (GET /holdings, app/db.py's
+  // holdings table -- 2026-07-27). Undefined when the ticker isn't in
+  // the user's holdings, in which case the value line is simply omitted.
+  value,
 }: {
   data: DashboardData;
   isSelected: boolean;
   onSelect: () => void;
+  value?: number;
 }) {
   const { ticker, company, health_score, quote, next_earnings_date } = data;
   const changeUp = (quote?.change_pct ?? 0) >= 0;
@@ -47,6 +60,10 @@ export function TickerCard({
                 {quote.change_pct?.toFixed(2)}%
               </span>
             </div>
+          )}
+
+          {value != null && (
+            <p className="text-xs text-muted-foreground">Value: {formatMoney(value)}</p>
           )}
 
           {next_earnings_date && (

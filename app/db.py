@@ -16,18 +16,31 @@ of bug. SQLAlchemy's default "postgresql://" scheme resolves to
 psycopg2, so _normalize_database_url below rewrites the scheme to
 "postgresql+psycopg://" explicitly rather than relying on a fallback.
 
-Four tables, created together by init_db(), but only price_snapshots is
-wired to anything in this pass:
-  - price_snapshots      -- built AND wired (this module's actual job)
+Five tables. price_snapshots and holdings are built AND wired; the
+other three (created by init_db() but not yet used) are schema only:
+  - price_snapshots      -- built AND wired (this module's original job)
+  - holdings             -- built AND wired (2026-07-27): real backend
+                             for what frontend/lib/mock-holdings.ts had
+                             been faking (ticker, shares, cost_basis_avg,
+                             purchase_date). One row per ticker by
+                             design -- multi-lot support explicitly
+                             deferred, matching the current UI. Note:
+                             this does NOT wire purchase_date into
+                             get_fundamentals_health_score() -- that
+                             signal computation is still current-state
+                             only (see health_score_history below).
+                             Persisting a purchase date and being able
+                             to answer a since-that-date comparison are
+                             two separate pieces of work.
   - health_score_history -- schema only; wiring is Q13's since-purchase-
                              comparison work, a separate item
   - user_memory          -- schema only; wiring is the guardrails/memory
                              item, a separate item
   - news_dedup           -- schema only; unused until the memory item
 
-Creating all four now, in one migration, rather than three separate
-schema changes later, was a deliberate call (see the doc) -- cheap
-either way, but worth naming as a choice.
+Creating all five now, in one migration, rather than separate schema
+changes later, was a deliberate call (see the doc) -- cheap either way,
+but worth naming as a choice.
 
 Retention: nothing in this module ever deletes a row. price_snapshots
 keeps every snapshot indefinitely -- the 1-year backfill and every
@@ -78,6 +91,24 @@ price_snapshots = Table(
     Column("date", Date, primary_key=True),
     Column("close", Float, nullable=False),
     Column("captured_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# Built AND wired (2026-07-27) -- see module docstring. ticker is the
+# primary key on purpose: one row per ticker, no multi-lot support.
+# Confirmed with Maiu directly (2026-07-27) rather than assumed --
+# matches the current 6-row mock UI and the mockup's Portfolio table,
+# neither of which shows multiple purchase lots for the same ticker.
+# If multi-lot support is ever needed, this needs a synthetic id PK
+# instead -- a real migration, not a small change, so worth deciding
+# deliberately rather than defaulting into it.
+holdings = Table(
+    "holdings",
+    metadata,
+    Column("ticker", String, primary_key=True),
+    Column("shares", Float, nullable=False),
+    Column("cost_basis_avg", Float, nullable=False),
+    Column("purchase_date", Date, nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False),
 )
 
 # Schema only this pass -- see module docstring. Composite PK
@@ -221,3 +252,77 @@ def get_price_history(ticker: str, limit: int = 90) -> list[dict]:
     with engine.connect() as conn:
         rows = conn.execute(stmt).fetchall()
     return [{"date": r.date.isoformat(), "close": r.close} for r in rows]
+
+
+def list_holdings() -> list[dict]:
+    """All holdings, ticker-sorted. Real replacement for
+    frontend/lib/mock-holdings.ts's MOCK_HOLDINGS array -- same four
+    user-facing fields (ticker, shares, cost basis, purchase date),
+    now read from Postgres instead of a hardcoded TS constant.
+    """
+    engine = get_engine()
+    stmt = select(
+        holdings.c.ticker,
+        holdings.c.shares,
+        holdings.c.cost_basis_avg,
+        holdings.c.purchase_date,
+    ).order_by(holdings.c.ticker)
+    with engine.connect() as conn:
+        rows = conn.execute(stmt).fetchall()
+    return [
+        {
+            "ticker": r.ticker,
+            "shares": r.shares,
+            "cost_basis_avg": r.cost_basis_avg,
+            "purchase_date": r.purchase_date.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+def upsert_holding(
+    ticker: str, shares: float, cost_basis_avg: float, purchase_date: date_type | str
+) -> None:
+    """Create the row for `ticker` if it doesn't exist, or fully
+    replace it if it does -- one row per ticker by design (see the
+    holdings table comment above), so this single function backs both
+    server.py's POST /holdings (create) and PUT /holdings/{ticker}
+    (update). Same upsert-on-conflict pattern save_price_snapshot
+    already uses above.
+    """
+    if isinstance(purchase_date, str):
+        purchase_date = datetime.fromisoformat(purchase_date).date()
+
+    ticker = ticker.upper()
+    engine = get_engine()
+    stmt = pg_insert(holdings).values(
+        ticker=ticker,
+        shares=shares,
+        cost_basis_avg=cost_basis_avg,
+        purchase_date=purchase_date,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["ticker"],
+        set_={
+            "shares": stmt.excluded.shares,
+            "cost_basis_avg": stmt.excluded.cost_basis_avg,
+            "purchase_date": stmt.excluded.purchase_date,
+            "updated_at": func.now(),
+        },
+    )
+    with engine.begin() as conn:
+        conn.execute(stmt)
+
+
+def delete_holding(ticker: str) -> bool:
+    """Deletes the one row for `ticker`. Returns True if a row was
+    actually removed, False if there was nothing to delete for that
+    ticker -- server.py's DELETE endpoint uses this to return 404 vs
+    204 instead of always claiming success.
+    """
+    ticker = ticker.upper()
+    engine = get_engine()
+    stmt = holdings.delete().where(holdings.c.ticker == ticker)
+    with engine.begin() as conn:
+        result = conn.execute(stmt)
+    return result.rowcount > 0

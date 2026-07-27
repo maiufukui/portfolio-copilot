@@ -89,6 +89,13 @@ app.add_middleware(
 )
 
 
+class HoldingRequest(BaseModel):
+    ticker: str
+    shares: float
+    cost_basis_avg: float
+    purchase_date: str  # YYYY-MM-DD
+
+
 class ChatRequest(BaseModel):
     ticker: str
     question: str
@@ -126,6 +133,55 @@ def dashboard(ticker: str) -> dict:
     if ticker not in TICKER_TO_COMPANY:
         raise HTTPException(status_code=400, detail=f"No data available for {ticker!r}.")
     return get_dashboard_data(ticker)
+
+
+@app.get("/holdings")
+def list_holdings() -> dict:
+    """Real backend for what frontend/lib/mock-holdings.ts had been
+    faking -- see app/db.py's holdings table comment (2026-07-27).
+    Both the Dashboard and Portfolio pages call this instead of each
+    holding its own copy of MOCK_HOLDINGS, so an edit on one page is
+    visible on the other -- the mock file's own docstring named this
+    as a known gap ("no shared store... nothing here persists past a
+    page reload anyway"), fixed by this being a real shared backend.
+    """
+    return {"holdings": db.list_holdings()}
+
+
+@app.post("/holdings", status_code=201)
+def create_holding(req: HoldingRequest) -> dict:
+    """Create or replace the one row for req.ticker -- one row per
+    ticker by design (see app/db.py), so POST and PUT both just call
+    upsert_holding(). Ticker validated against TICKER_TO_COMPANY, same
+    check /dashboard/{ticker} already does, since the RAG/health-score
+    pipeline only has ingested data for these 6 tickers -- accepting an
+    unmapped ticker here would create a holding the rest of the app can
+    never show a health score or chat answer for.
+    """
+    ticker = req.ticker.upper()
+    if ticker not in TICKER_TO_COMPANY:
+        raise HTTPException(status_code=400, detail=f"No data available for {ticker!r}.")
+    db.upsert_holding(ticker, req.shares, req.cost_basis_avg, req.purchase_date)
+    return {"status": "created", "ticker": ticker}
+
+
+@app.put("/holdings/{ticker}")
+def update_holding(ticker: str, req: HoldingRequest) -> dict:
+    """Same upsert as POST -- kept as a separate verb/route so the
+    frontend's edit action reads as an update, not a second create,
+    even though the underlying write is identical."""
+    ticker = ticker.upper()
+    if ticker not in TICKER_TO_COMPANY:
+        raise HTTPException(status_code=400, detail=f"No data available for {ticker!r}.")
+    db.upsert_holding(ticker, req.shares, req.cost_basis_avg, req.purchase_date)
+    return {"status": "updated", "ticker": ticker}
+
+
+@app.delete("/holdings/{ticker}", status_code=204, response_model=None)
+def delete_holding(ticker: str) -> None:
+    deleted = db.delete_holding(ticker.upper())
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"No holding found for {ticker.upper()!r}.")
 
 
 @app.post("/chat", response_model=ChatResponse)
