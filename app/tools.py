@@ -491,8 +491,7 @@ def get_fundamentals_health_score(ticker: str, force_refresh: bool = False) -> d
     discretionary one. This classifier applies the dollar/count
     thresholds as a conservative signal and labels every result with
     that caveat rather than silently overstating precision -- a real
-    plan-vs-discretionary filter is a pending follow-up (see
-    eval_dataset.json Q13).
+    plan-vs-discretionary filter is a pending follow-up.
     """
     ticker = ticker.upper()
     now = time.monotonic()
@@ -638,12 +637,30 @@ def get_dashboard_data(ticker: str) -> dict:
             # depend on trusting Tavily's own relevance score alone.
             results = search_tavily(company, tavily_key, time_range="month", max_results=8, topic="news")
             company_lower = company.lower()
-            relevant = [
-                r
-                for r in results
-                if company_lower in (r.get("title") or "").lower()
-                or company_lower in (r.get("content") or "").lower()
-            ]
+            # Widened 2026-07-27 (Maiu: ALAB showing zero articles, real
+            # bug) -- the original filter only matched the full company
+            # name ("astera labs") as a literal substring. Financial
+            # headlines routinely use the bare ticker instead
+            # ("ALAB soars on AI demand..."), especially for a name like
+            # Astera Labs that isn't a common dictionary word the way
+            # "Apple" is -- those headlines were being silently dropped
+            # even when genuinely about this company. Ticker match uses a
+            # word-boundary regex, not a plain substring check, so a
+            # 3-5 letter ticker can't accidentally match inside an
+            # unrelated longer word.
+            ticker_pattern = re.compile(rf"\b{re.escape(ticker.lower())}\b")
+
+            def _is_relevant(r: dict) -> bool:
+                title = (r.get("title") or "").lower()
+                content = (r.get("content") or "").lower()
+                return (
+                    company_lower in title
+                    or company_lower in content
+                    or bool(ticker_pattern.search(title))
+                    or bool(ticker_pattern.search(content))
+                )
+
+            relevant = [r for r in results if _is_relevant(r)]
             news = [
                 {
                     "title": r.get("title"),
@@ -656,7 +673,13 @@ def get_dashboard_data(ticker: str) -> dict:
             # Deliberately no synthetic fallback text here if `news` ends up
             # empty -- an honest "nothing found" is correct output when
             # nothing relevant clears the bar, not a bug to paper over.
-        except Exception:  # noqa: BLE001 -- news is a nice-to-have on this endpoint, never worth a 500
+        except Exception as e:  # noqa: BLE001 -- news is a nice-to-have on this endpoint, never worth a 500
+            # Logged now (2026-07-27), not silently swallowed -- an empty
+            # `news` list caused by a real API/network failure was
+            # previously indistinguishable from an empty list caused by
+            # "nothing relevant found," which made a real bug (this one)
+            # harder to diagnose than it needed to be.
+            print(f"get_dashboard_data: news search failed for {ticker!r}: {e!r}", file=sys.stderr)
             news = []
 
     return {

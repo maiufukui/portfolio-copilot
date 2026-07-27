@@ -279,7 +279,32 @@ def classify_revenue_trend(series: list[dict]) -> dict:
     else:
         status = "monitor"
 
-    return {"status": status, "yoy_growth_by_quarter": recent, "qoq_growth_by_quarter": qoq_growth}
+    # Chart data for the frontend (2026-07-27, Maiu: revenue chart should
+    # show QoQ growth, not YoY, and cover ~2 years) -- a SEPARATE
+    # computation from qoq_growth above, on purpose: qoq_growth is
+    # deliberately frozen at the last 3 deltas because that's the exact
+    # window the intact/monitor/at_risk status streak is tuned against
+    # (see this function's own docstring). Widening qoq_growth itself to
+    # show more history would silently widen the status window too. This
+    # walks the full series instead, capped at the last 8 quarters (~2
+    # years) of QoQ deltas, purely for display -- status above never reads
+    # this variable.
+    qoq_growth_chart = []
+    for i in range(1, len(series)):
+        if not _is_adjacent_quarter(series[i - 1], series[i]):
+            continue  # skip just this one broken pair -- a display list, not a decision streak
+        qoq_growth_chart.append({
+            "period": series[i]["end"],
+            "qoq_pct": round((series[i]["val"] - series[i - 1]["val"]) / series[i - 1]["val"] * 100, 1),
+        })
+    qoq_growth_chart = qoq_growth_chart[-8:]
+
+    return {
+        "status": status,
+        "yoy_growth_by_quarter": recent,
+        "qoq_growth_by_quarter": qoq_growth,
+        "qoq_growth_chart": qoq_growth_chart,
+    }
 
 
 def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[dict]) -> dict:
@@ -315,7 +340,18 @@ def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[
         return {"status": "insufficient_data", "quarters_available": len(margins),
                 "note": "Need >= 4 quarters to compute 3 QoQ deltas."}
 
-    recent = margins[-4:]
+    # Two SEPARATE windows over the same margins list (2026-07-27, Maiu):
+    # status_window is exactly what this function always used (last 4
+    # quarters -> 3 QoQ deltas) and drives the intact/monitor/at_risk call
+    # below, untouched. chart_window is only for what the frontend
+    # displays -- the raw margin % per quarter (a level, not a growth
+    # rate; margin has never been charted as a rate of change and stays
+    # that way here), widened to the last 8 quarters (~2 years) of
+    # whatever's available. Before this split, one list (`recent`) did
+    # both jobs, so widening the chart would have silently widened the
+    # status calculation too -- see chat discussion, 2026-07-27.
+    status_window = margins[-4:]
+    chart_window = margins[-8:]
 
     # Same adjacency guard as classify_revenue_trend -- margins here come
     # from matching revenue_series to gross_profit_series by exact end
@@ -325,19 +361,19 @@ def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[
         return 75 <= (date.fromisoformat(b["period"]) - date.fromisoformat(a["period"])).days <= 100
 
     qoq_deltas = []
-    for i in range(1, len(recent)):
-        if not _is_adjacent_quarter(recent[i - 1], recent[i]):
+    for i in range(1, len(status_window)):
+        if not _is_adjacent_quarter(status_window[i - 1], status_window[i]):
             qoq_deltas = []  # a gap breaks the streak -- don't compute across it
             break
         qoq_deltas.append({
-            "period": recent[i]["period"],
-            "qoq_bps": round((recent[i]["margin_pct"] - recent[i - 1]["margin_pct"]) * 100),
+            "period": status_window[i]["period"],
+            "qoq_bps": round((status_window[i]["margin_pct"] - status_window[i - 1]["margin_pct"]) * 100),
         })
 
     if len(qoq_deltas) < 3:
         return {"status": "insufficient_data", "qoq_quarters_available": len(qoq_deltas),
                 "note": "Need 3 consecutive, gap-free quarters to compute the QoQ streak.",
-                "margin_by_quarter": recent}
+                "margin_by_quarter": chart_window}
 
     worst_single_drop_bps = min((d["qoq_bps"] for d in qoq_deltas), default=0)
     down = sum(1 for d in qoq_deltas if d["qoq_bps"] < 0)
@@ -354,7 +390,7 @@ def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[
 
     return {
         "status": status,
-        "margin_by_quarter": recent,
+        "margin_by_quarter": chart_window,
         "qoq_bps_by_quarter": qoq_deltas,
     }
 
