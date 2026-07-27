@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-07-27T20:59:32.737221+00:00",
+  "runs_per_question": 3,
+  "ticker": "ALAB",
+  "questions": {
+    "1": {
+      "question": "ALAB dropped 12% this week. I'm getting nervous\u2014should I sell?",
+      "runs": [
+        {
+          "answer": "Regarding filings, the most recent relevant filing is an 8-K dated June 8, 2026, reporting the 2026 Annual Stockholders Meeting held on June 4, 2026. At this meeting, all three Class II director nominees were elected to the board, the appointment of PricewaterhouseCoopers LLP as independent auditor was ratified, and advisory votes on executive compensation were approved to be held annually going forward. There were no disclosures of leadership changes or other material events that would impact fundamentals in this filing (8-K, 2026-06-08). Other recent filings such as the 10-K from February 20, 2026, and 10-Q from May 6, 2026, do not indicate any new risks or material changes relevant to your concerns.\n\nThe fundamentals health score remains \"at risk\" primarily due to insider selling, as previously noted.\n\nOn the market data side, ALAB's stock price dropped about 14.6% over the past week, more than the 12% you mentioned. The next earnings report is scheduled for August 4, 2026.\n\nInsider activity shows significant open market selling by insiders in the last 30 days at prices around $450-$467 per share, contributing to the \"at risk\" status.\n\nAnalyst recommendations remain positive with no recent changes: 7 strong buys, 14 buys, and 9 holds, with no sell ratings.\n\nIn summary, filings show no new adverse disclosures or leadership changes. The fundamentals remain at risk due to insider selling and the recent sharp price decline. Whether to sell depends on your risk tolerance and investment horizon, but caution is warranted ahead of the upcoming earnings report.",
+          "tools_used": [
+            "get_market_data",
+            "search_live_news",
+            "search_filings"
+          ],
+          "guards_fired": [
+            "filings_claim"
+          ]
+        },
+        {
+          "answer": "ALAB's stock price actually dropped about 14.6% over the past week, which is even more than the 12% you mentioned. This is a significant decline. Insider selling has been notable recently, with multiple open market sales by insiders on July 1, 2026, totaling substantial shares sold at prices around $450-$467. This insider activity contributes to the current \"at risk\" status of ALAB's fundamentals, particularly due to insider selling.\n\nHowever, the fundamentals health score shows that ALAB's revenue growth remains intact with strong year-over-year and quarter-over-quarter growth, and leadership is intact with no recent disruptive changes. Margins are being monitored but are relatively stable.\n\nAnalyst recommendations remain positive with no sell ratings, and the next earnings report is scheduled for August 4, 2026, which may provide more clarity on the company's outlook.\n\nIn summary, the recent price drop and insider selling are concerning and have put ALAB's fundamentals at risk. If you are nervous, it may be prudent to review your investment goals and risk tolerance carefully. Watching the upcoming earnings report and any new disclosures could help inform your decision on whether to hold or sell.",
+          "tools_used": [
+            "get_market_data",
+            "search_live_news"
+          ],
+          "guards_fired": []
+        },
+        {
+          "answer": "ALAB's stock price actually dropped about 14.6% over the past week, which is even more than the 12% you mentioned. This is a significant decline.\n\nLooking at insider activity, there has been notable insider selling in the last 30 days, with multiple open market sales by insiders at prices around $450-$467 per share. This insider selling is a factor contributing to the fundamentals health score being \"at risk\" due to insider activity.\n\nHowever, the fundamentals health score shows that ALAB's revenue growth remains intact with strong year-over-year and quarter-over-quarter growth. Margins are being monitored but are relatively stable. Leadership is intact with no recent concerning disclosures.\n\nAnalyst recommendations remain positive with no sell or strong sell ratings among 30 analysts covering the stock.\n\nThe next earnings report is scheduled for August 4, 2026, which may provide more clarity on the company's outlook.\n\nRegarding filings, the most recent relevant filing is an 8-K dated June 8, 2026, reporting the 2026 Annual Stockholders Meeting held on June 4, 2026. At this meeting, all three Class II director nominees were elected, the appointment of PricewaterhouseCoopers LLP as independent auditor was ratified, and advisory votes on executive compensation were approved to be held annually. There were no disclosures of material adverse events or leadership changes in this filing. Other recent filings such as the 10-K and 10-Q do not show any new material risks or issues disclosed that would explain the stock price drop or change the fundamentals health score (sources: 8-K 2026-06-08, 10-K 2026-02-20, 10-Q 2026-05-06).\n\nIn summary, the stock has experienced a sharp price drop and insider selling is a concern, which aligns with the \"at risk\" fundamentals health score driven by insider activity. Revenue growth and leadership remain solid. No new material adverse disclosures have been made in recent filings. Whether to sell depends on your risk tolerance and investment horizon, but the fundamentals do not currently show deterioration in business performance, only insider selling risk and market price weakness.",
+          "tools_used": [
+            "get_market_data",
+            "search_live_news",
+            "search_filings"
+          ],
+          "guards_fired": [
+            "filings_claim"
+          ]
+        }
+      ],
+      "tools_stable": false,
+      "guards_stable": false
+    },
+    "2": {
+      "question": "Does ALAB rely heavily on any single customer for revenue -- is any one customer a majority?",
+      "runs": [
+        {
+          "answer": "ALAB does rely heavily on a limited number of customers for its revenue. According to the most recent 10-K filing for the year ended December 31, 2025, one end customer represented more than 70% of ALAB's revenue, and the top three end customers together accounted for approximately 86% of the revenue. This indicates a significant customer concentration risk. The company also notes that its distributors and end customers' manufacturing partners provide information about which end customer will receive the products, allowing ALAB to estimate revenue attributable to specific end customers.\n\nFor the three months ended March 31, 2026, the company reported that several customers individually comprised 10% or more of its revenue, with Customer A accounting for 29%, Customer B 21%, Customer C 16%, Customer D 12%, and Customer E 12%. This further confirms that no single customer is a majority in that quarter, though several customers each contributed over 10% of revenue.\n\nImportantly, the company explicitly states that certain customers listed are manufacturing partners purchasing on behalf of end customers, and that end customers may shift production volumes among their manufacturing partners from period to period. The revenue concentration percentages attributable to individual direct customers may fluctuate and are not necessarily representative of changes in underlying end-customer demand. However, the company\u2019s disclosure in the 10-K confirms that in 2025, one end customer represented more than 70% of revenue, and the top three end customers represented about 86% of revenue, reflecting a very high end-customer concentration despite the distributor/reseller layer.\n\nIn summary, ALAB has a high dependency on a few major end customers, with one end customer historically representing a majority of revenue (over 70% in 2025), and the top three end customers together accounting for the vast majority of revenue. This end-customer concentration risk is material and acknowledged by the company.\n\nSource: ALAB 10-K for year ended 2025-12-31 and 10-Q for quarter ended 2026-03-31.",
+          "tools_used": [
+            "search_filings_exact",
+            "search_filings"
+          ],
+          "guards_fired": [
+            "no_majority_customer"
+          ]
+        },
+        {
+          "answer": "ALAB does rely heavily on a limited number of customers for its revenue. According to the 10-K filing dated 2026-02-20, in 2025, one end customer represented more than 70% of ALAB's revenue, and the top three end customers accounted for approximately 86% of the revenue. This indicates a significant customer concentration risk. The company sells primarily to distributors and end customers' manufacturing partners, and the revenue concentration percentages attributable to individual direct customers may fluctuate due to shifts in production volumes among manufacturing partners.\n\nThe filing also notes that the company anticipates continuing dependence on a limited number of end customers for a significant portion of its revenue in the future, and the portion attributable to certain customers may increase. However, there are risks such as volatile demand, potential redesigns by customers to use fewer or no ALAB products, and competition that could impact sales to these top customers.\n\nIn summary, yes, ALAB has a major reliance on a single customer for the majority of its revenue, with one customer contributing over 70% and the top three customers about 86% of total revenue in 2025. This is a material customer concentration risk disclosed by the company. (Source: ALAB 10-K filing 2026-02-20)",
+          "tools_used": [
+            "search_filings_exact",
+            "search_filings"
+          ],
+          "guards_fired": []
+        },
+        {
+          "answer": "ALAB does rely heavily on a limited number of customers for its revenue. According to the 10-K filing dated 2026-02-20, in 2025, one end customer represented more than 70% of ALAB's revenue, and the top three end customers accounted for approximately 86% of the revenue. This indicates a significant customer concentration risk, with a single customer being a majority revenue contributor. The company also notes that its distributors and end customers\u2019 manufacturing partners provide purchase order information that helps estimate revenue attributable to specific end customers.\n\nThis concentration means ALAB's financial performance is highly dependent on a few key customers, and any loss or reduction in demand from these customers could materially impact the company's operations and financial condition.\n\nSource: ALAB 10-K filing dated 2026-02-20, \"Concentrations of Credit Risk and Major Customers\" and \"Ecosystem and Customers\" sections.",
+          "tools_used": [
+            "search_filings_exact",
+            "search_filings"
+          ],
+          "guards_fired": []
+        }
+      ],
+      "tools_stable": true,
+      "guards_stable": false
+    },
+    "3": {
+      "question": "Revenue growth has slowed for several quarters straight -- does the latest quarter suggest that's stabilizing, or is a bigger slowdown coming?",
+      "runs": [
+        {
+          "answer": "In the latest quarterly earnings call transcript for Q1 2026 (period ended March 31, 2026), management reported revenue of $308.4 million, which was up 14% sequentially and up 93% year-over-year. They highlighted broad-based revenue growth across their signal conditioning and fabric switch product portfolios, driven by strong customer demand and adoption of new products like the Scorpio X Series. The company expects continued strong revenue growth in Q2 2026, with guidance of $355 million to $365 million, representing a 15% to 18% sequential increase. This outlook is supported by ongoing strength in AI fabric and signal conditioning portfolios and new product ramps. Management expressed confidence in sustaining above-industry revenue growth over the long term while maintaining profitability. (Source: Q1 2026 earnings call transcript)\n\nNo filings such as 8-K or 10-Q/10-K explicitly mention a revenue growth slowdown or caution about a bigger slowdown coming in the near term. The 8-K filed on June 8, 2026, relates to the Annual Stockholders Meeting and does not discuss operational results or revenue trends. The 10-K filed on February 20, 2026, and the 10-Q filed on May 6, 2026, do not contain new disclosures signaling a revenue growth slowdown beyond the usual risk factors about market conditions and competition.\n\nTherefore, the filings and management commentary confirm that while revenue growth has moderated from extremely high levels, it remains strong and is expected to continue growing robustly in the near term. There is no indication from the latest filings or earnings commentary that a bigger slowdown is imminent.\n\nThis supports the fundamentals health score's assessment that revenue growth is intact and stabilizing rather than deteriorating sharply.\n\nSummary:\n- Latest quarter revenue growth: 14% sequential, 93% YoY (Q1 2026)\n- Q2 2026 guidance: 15%-18% sequential growth expected\n- No filings or disclosures signaling a bigger slowdown\n- Management confident in sustained strong revenue growth\n\nThis confirms the prior conclusion that revenue growth is stabilizing at a high level rather than signaling a bigger slowdown ahead.",
+          "tools_used": [
+            "search_filings_exact",
+            "search_filings"
+          ],
+          "guards_fired": [
+            "filings_claim"
+          ]
+        },
+        {
+          "answer": "The latest filings do not contain any new specific commentary or guidance on revenue growth trends or a slowdown for the most recent quarter. The most recent 8-K dated June 8, 2026, relates to the annual stockholders meeting and director elections, with no mention of revenue growth or slowdown (8-K, 2026-06-08). The 10-K filed on February 20, 2026, discusses risks related to revenue growth and the challenges of sustaining growth but does not provide updated quarterly commentary on growth trends (10-K, 2026-02-20). The 10-Q filed May 6, 2026, includes financial statements and exhibits but no explicit discussion of revenue growth slowdown or stabilization in the text excerpts available (10-Q, 2026-05-06).\n\nHowever, from a semantic search of earnings call transcripts for Q1 2026 (period ended March 31, 2026), management reported strong revenue growth of 93% year-over-year and 14% quarter-over-quarter, with broad-based growth across product portfolios and positive outlook for continued strong revenue growth driven by AI fabric and PCIe Gen 6 adoption (Q1 2026 earnings call transcript). This supports the view that revenue growth remains robust and is stabilizing at a high level rather than indicating a bigger slowdown.\n\nTherefore, the filings and transcript evidence confirm the fundamentals health score's \"intact\" status for revenue growth, showing no signs of a material slowdown or destabilization in the latest quarter.\n\nThe rest of my prior answer remains unchanged: ALAB's revenue growth has slowed somewhat from extremely high levels but remains very strong and stable, with no indication of a bigger slowdown coming imminently. This aligns with the fundamentals health score and the latest management commentary.\n\nSources:\n- 8-K, 2026-06-08 (annual meeting, no revenue growth commentary)\n- 10-K, 2026-02-20 (risk factors on growth, no new quarterly commentary)\n- 10-Q, 2026-05-06 (financials, no explicit growth commentary)\n- Q1 2026 earnings call transcript (strong revenue growth, positive outlook)",
+          "tools_used": [
+            "search_filings_exact",
+            "search_filings"
+          ],
+          "guards_fired": [
+            "filings_claim"
+          ]
+        },
+        {
+          "answer": "The latest quarterly earnings call transcript for Q1 2026 (period ended March 31, 2026) provides relevant commentary on revenue growth and outlook:\n\n- Revenue for Q1 2026 was $308.4 million, up 14% sequentially and up 93% year-over-year, showing strong broad-based growth across signal conditioning and fabric switch product portfolios.\n- Management highlighted strong customer demand and significant acceleration in top-line growth.\n- The Scorpio product family, including the Scorpio X Series, is a key growth driver, expected to become the largest product line by year-end 2026.\n- For Q2 2026, management guided revenue to be between $355 million and $365 million, representing a 15% to 18% sequential increase, driven by continued strength in AI fabric and signal conditioning portfolios.\n- Management expects strong revenue growth to continue through 2026 and into 2027, driven by AI fabric proliferation and industry transitions to PCIe 6 and higher-speed connectivity.\n- Non-GAAP operating margin for Q1 was 36.2%, with continued investment to drive above-industry revenue growth while maintaining profitability.\n\nThis detailed management commentary from the Q1 2026 earnings call transcript (source: transcript_Q1_2026.txt) confirms that although revenue growth rates have moderated from prior peaks, the company expects continued strong growth and does not signal a bigger slowdown imminently. The growth is supported by product mix shifts and expanding design wins in AI infrastructure markets.\n\nNo contradictory or cautionary language about a revenue growth slowdown was found in the recent 8-K or 10-Q filings checked.\n\nTherefore, the filings and management commentary support the conclusion that the latest quarter shows revenue growth stabilizing at a still robust pace, with guidance indicating continued strong growth ahead.\n\nThis aligns with the Fundamentals Health Score for ALAB, which marks revenue growth as intact despite the slowing trend.\n\nIf you want, I can also check recent news or market data for any additional context.",
+          "tools_used": [
+            "search_filings_exact",
+            "search_filings"
+          ],
+          "guards_fired": [
+            "filings_claim"
+          ]
+        }
+      ],
+      "tools_stable": true,
+      "guards_stable": true
+    },
+    "4": {
+      "question": "Is there anything in ALAB's latest earnings I should be worried about moving forward, especially around margin or guidance?",
+      "runs": [
+        {
+          "answer": "In Astera Labs' latest earnings for Q1 2026, there are several points relevant to margin and guidance:\n\n1. Margin:\n- The GAAP gross margin was 76.3%, and the non-GAAP gross margin was 76.4%, showing a slight improvement.\n- Non-GAAP operating margin was 36.2%, up from 33.7% in the prior year quarter.\n- The company excludes non-cash stock-based compensation and acquisition-related costs in non-GAAP measures.\n- There is a mention of a 200-basis-point non-cash gross margin headwind from a newly executed customer warranty in Q2 guidance.\n\n2. Guidance:\n- Q2 2026 revenue guidance is $355 million to $365 million, implying 15% to 18% sequential growth.\n- Non-GAAP EPS guidance for Q2 is $0.68 to $0.70.\n- Management expects strong revenue growth to continue through 2026 and into 2027, driven by AI infrastructure spending and product portfolio expansion.\n- The company is investing strategically to support growth, including acquisitions and expanding product lines.\n\n3. Business Highlights:\n- Strong demand for PCIe Gen 6 products and AI fabric switches.\n- New product launches and design wins, including the Scorpio X-Series 320-lane Smart Fabric Switch.\n- Expansion into optical engines and interconnects.\n- Cash and marketable securities of $1.2 billion, sufficient to fund operations for at least 12 months.\n\nOverall, the margin remains strong and stable with a slight headwind expected in Q2 due to warranty costs, but the company is guiding for solid revenue and earnings growth. There is no immediate red flag on margin or guidance that suggests a fundamental risk moving forward. However, the Fundamentals Health Score for ALAB currently marks margin as \"monitor\" and insider activity as \"at risk,\" so it is prudent to keep an eye on margin trends and insider transactions.\n\nSources:\n- Q1 2026 10-Q filing (2026-05-06)\n- Q1 2026 earnings call transcript\n- Recent news and analyst reports from July 2026",
+          "tools_used": [
+            "search_filings",
+            "search_live_news"
+          ],
+          "guards_fired": []
+        },
+        {
+          "answer": "In Astera Labs' latest earnings for Q1 2026, the company reported strong financial performance with revenue of $308.4 million, up 93% year-over-year, and a non-GAAP gross margin of 76.4%, which improved by 70 basis points sequentially. The non-GAAP operating margin was 36.2%, showing solid profitability. Management provided guidance for Q2 2026 revenue in the range of $355 million to $365 million, implying about 15% to 18% sequential growth, with a non-GAAP EPS guidance of $0.68 to $0.70. They also noted a 200-basis-point non-cash gross margin headwind from a newly executed customer warranty reserve.\n\nThe company is investing strategically to support growth, including acquisitions and expanding product portfolios, particularly in AI data center connectivity solutions. They expect strong continued revenue growth driven by AI infrastructure spending and new product ramps.\n\nOverall, there is no immediate cause for concern around margins or guidance. Margins remain strong and are expected to remain healthy despite the noted non-cash headwind. Guidance is robust, reflecting confidence in demand and product adoption.\n\nThis aligns with the Fundamentals Health Score for ALAB, which shows revenue growth intact and margin status as \"monitor\" but not deteriorating. The insider activity is at risk, but that does not directly impact margin or guidance concerns.\n\nSources:\n- ALAB Q1 2026 10-Q filing (2026-05-06)\n- ALAB Q1 2026 earnings call transcript\n- Recent news and analyst reports from July 2026 (e.g. simplywall.st, tikr.com)",
+          "tools_used": [
+            "search_filings",
+            "search_live_news"
+          ],
+          "guards_fired": []
+        },
+        {
+          "answer": "In ALAB's latest earnings for the quarter ended March 31, 2026, there are several points relevant to margin and guidance:\n\n1. Margin Performance:\n- GAAP gross margin was 76.3%, up 136 basis points from 74.9% in the same quarter last year.\n- Non-GAAP gross margin was 76.4%, up 70 basis points sequentially, primarily driven by a favorable product mix and a lower mix of hardware sales within the signal conditioning portfolio.\n- Non-GAAP operating margin was 36.2%, reflecting continued profitability while investing for sustained revenue growth.\n\n2. Guidance:\n- For the second quarter of 2026, ALAB expects non-GAAP gross margin to be approximately 73%. This includes an estimated 200 basis point non-cash impact from a one-time customer agreement.\n- Non-GAAP operating expenses for Q2 are projected at $128 million to $131 million.\n- Revenue guidance for Q2 is expected between $355 million and $365 million, representing a 15%-18% sequential increase driven by further adoption of key products.\n\n3. Commentary:\n- The company is strategically investing to drive strong continued growth, with robust demand reflecting secular AI infrastructure spending and expansion towards higher-value solutions.\n- They are cautious about custom business opportunities due to margin and risk implications and will be systematic in pursuing such opportunities.\n\nOverall, while margins improved year-over-year and remain strong, the guidance for Q2 shows a margin decline to about 73% non-GAAP gross margin, partly due to a one-time non-cash impact. This suggests some margin pressure ahead, though the company remains profitable and is investing for growth. The margin signal in the fundamentals health score is currently \"monitor,\" which aligns with this cautious outlook.\n\nNo alarming negative surprises or risks around margin or guidance were disclosed, but the margin guidance dip and one-time impacts warrant monitoring going forward.\n\nSource: ALAB 10-Q for Q1 2026 (filed 2026-05-06) and Q1 2026 earnings call transcript.",
+          "tools_used": [
+            "search_filings",
+            "search_filings_exact",
+            "search_live_news"
+          ],
+          "guards_fired": []
+        }
+      ],
+      "tools_stable": false,
+      "guards_stable": true
+    }
+  }
+}

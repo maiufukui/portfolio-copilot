@@ -67,7 +67,7 @@ def format_recommendation_trends(trends: list[dict]) -> str:
 # Distinct from the Q6 driver above: no event, no Tavily search -- just Finnhub
 # recommendation-trends, diffed period-over-period. The diff itself is computed
 # here in plain Python (deterministic, exact) rather than asked of the LLM --
-# same reasoning as Q10/Q13's deterministic-assertion pieces elsewhere in this
+# same reasoning as Q10's deterministic-assertion pieces elsewhere in this
 # eval set: don't trust an LLM to do subtraction when Python already can, and
 # score-check it exactly instead of hoping a judge notices a wrong diff.
 RATING_CATEGORIES = ["strongBuy", "buy", "hold", "sell", "strongSell"]

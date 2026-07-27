@@ -6,3 +6,11 @@ __pycache__/
 Data/**/*_files/
 Data/**/*.html
 .embedding_cache/
+
+# Scratch debug output from manual/local testing sessions -- not deliverables
+q1_*.txt
+q2_*.txt
+q3_*.txt
+q4_*.txt
+q5_*.txt
+eval_output.txt

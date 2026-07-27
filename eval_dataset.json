@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Locked 12-question eval dataset for the Personal Portfolio Copilot capstone. See Personal Portfolio Copilot-prd.md Task 1 §4 for the source table and methodology note. Thesis concept retired -- questions previously comparing content against a user's free-text thesis now test either objective driver-identification (Q1) or the Fundamentals Health Score (Q2, Q7, Q11, Q13).",
+    "description": "Locked 11-question eval dataset for the Personal Portfolio Copilot capstone (12 originally; Q13 removed 2026-07-27 as a descoped use case -- see Personal Portfolio Copilot-prd.md Task 1 §4). See the same section for the source table and methodology note. Thesis concept retired -- questions previously comparing content against a user's free-text thesis now test either objective driver-identification (Q1) or the Fundamentals Health Score (Q2, Q7, Q11).",
     "scoring_methods": {
       "ragas_triad": "RAGAS Faithfulness, LLMContextRecall, FactualCorrectness against a written reference answer. Session 6 / harness shape per Session 10 run_eval.py.",
       "tool_call_goal_topic": "Tool-call accuracy (right tool, right args), goal accuracy (final answer satisfies the request), topic adherence (stays grounded in the user's actual holdings and Fundamentals Health Score, not thesis). Normalized from a LangGraph trace, per Session 6.",
@@ -158,18 +158,6 @@
       "status": "not_built",
       "test_cases": [
         {"tickers": ["AAPL", "ALAB", "MRVL", "NBIS"]}
-      ]
-    },
-    {
-      "id": 13,
-      "question_template": "Has anything about {company}'s underlying business gotten worse since I bought it -- revenue, margins, insider activity, or leadership?",
-      "category": "hybrid",
-      "scoring_method": "hybrid",
-      "expected_behavior": "Runs the four-signal Fundamentals Health Score (Task 2 §4): reports each sub-signal's status and the overall worst-of rollup, with the specific numbers/events driving any non-intact rating. Deliberately scored as a CURRENT-STATE answer, not a true point-in-time diff against date_purchased -- no historical health-score snapshot exists anywhere in this codebase, so a correct response reports current status honestly rather than fabricating a since-you-bought-it comparison it has no data to support (see PRD Open Items).",
-      "reuses": "test_q13.py: precomputes real ground truth (get_fundamentals_health_score, already computed for every live agent turn) before asking the agent anything, then deterministically checks all four sub-signal names are addressed and the worst-of overall status is reflected, plus an LLM judge for rollup_accuracy/signal_completeness/honest_framing. Six-attempt fix history, full detail in the PRD's Open Items: (1) prompt-only rule in STABLE_SYSTEM_PROMPT -- insufficient; (2) response-side keyword ban-list -- evaded by paraphrase ('have not gotten worse... remain intact or improved'); (3) same classifier gated by a question-side keyword list -- same brittleness one level removed; (4) ungated LLM classifier plus an appended disclaimer -- the classifier correctly detected the overclaim, but the disclaimer sat after a comparison claim already made earlier in the same response, so the message still contradicted itself; (5) the model removed from the framing decision entirely -- get_fundamentals_health_score()'s already-deterministic signal statuses rendered directly as a fixed Python-formatted block (_render_current_status_block in app/graph.py) and prepended to every answer, model instructed to add only supporting detail underneath it. A real run against ALAB after (5) caught a further gap: rollup_accuracy and honest_framing PASSed but signal_completeness FAILed -- margin was never mentioned, because margin and revenue_growth are computed directly from XBRL data inside get_fundamentals_health_score() and never go through an agent tool call, so the narrative composer (which only reads tool-call outputs) had nothing to say about them; (6) _render_signal_facts() added to hand the composer every signal's raw supporting numbers regardless of source (tool call or direct XBRL fetch). Re-run against ALAB: all three criteria PASS (rollup_accuracy, signal_completeness, honest_framing). Real RAGAS ToolCallAccuracy also scored 1.00 on the same run.",
-      "status": "built",
-      "test_cases": [
-        {"ticker": "ALAB", "company": "Astera Labs", "date_purchased": "2025-08-01"}
       ]
     }
   ]

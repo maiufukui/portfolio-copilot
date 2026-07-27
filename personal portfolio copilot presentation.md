@@ -59,7 +59,8 @@ each tied to a specific locked eval question so the persona slide isn't generic:
    fundamentals are checked. (Embodies eval Q7: "Company X just dropped 8% today,
    I'm nervous, should I sell?")
 3. **The Thesis-less Rebuyer** — bought for a reason months ago, can't reconstruct
-   or locate the original thesis now. (Embodies eval Q9/Q13.)
+   or locate the original thesis now. (Embodies eval Q9; a since-purchase-comparison
+   question, formerly Q13, was removed 2026-07-27 as a descoped use case.)
 
 ## 5. Problem statement (final copy, user-supplied)
 

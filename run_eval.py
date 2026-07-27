@@ -1,10 +1,11 @@
 """
 Eval harness runner for the Personal Portfolio Copilot capstone.
 
-Reads eval_dataset.json (12 locked questions -- ids 1-9, 11-13; id 10 was
-retired) and runs each one that's actually buildable today against real
-pipelines, scoring with the two methods described in the PRD (Task 1 §4,
-"Evaluation methodology"):
+Reads eval_dataset.json (11 locked questions -- ids 1-9, 11-12; id 10 was
+retired, id 13 removed 2026-07-27 along with the since-purchase-comparison
+use case it tested -- see the PRD's Task 1 §4) and runs each one that's
+actually buildable today against real pipelines, scoring with the two
+methods described in the PRD (Task 1 §4, "Evaluation methodology"):
 
 - RAG questions (category "rag"): scored with RAGAS -- Faithfulness always,
   plus LLMContextRecall and FactualCorrectness when a test case has a
@@ -15,8 +16,8 @@ pipelines, scoring with the two methods described in the PRD (Task 1 §4,
 - Tool-calling questions (category "tool_calling" / "hybrid"): NOT scored
   by this file directly -- it prints a pointer to each question's own
   standalone test_qN.py script for manual review, rather than duplicating
-  that scoring logic here. As of this session, three of those scripts
-  (test_q9.py, test_q11.py, test_q13.py) score real RAGAS multi-turn
+  that scoring logic here. As of this session, two of those scripts
+  (test_q9.py, test_q11.py) score real RAGAS multi-turn
   metrics -- ToolCallAccuracy and AgentGoalAccuracyWithReference (see
   eval_tool_call_accuracy.py) -- against the real deployed LangGraph
   agent (app/graph.py), plus a custom PASS/FAIL LLM-judge prompt for
@@ -33,7 +34,7 @@ skipped, with the reason printed -- see eval_dataset.json's "reuses" field
 per question for exactly what's missing.
 
 For a single consolidated run across every question that has ANY real
-automated scoring (RAG questions here plus Q7/Q9/Q11/Q13's tool-calling
+automated scoring (RAG questions here plus Q7/Q9/Q11's tool-calling
 scoring), persisted to one JSON scorecard instead of scattered stdout
 across 8 separate scripts, see run_scorecard.py -- it imports this
 file's RAG_RUNNERS directly rather than duplicating this scoring logic.
@@ -42,7 +43,7 @@ Usage:
     python run_eval.py                        # run everything runnable
     python run_eval.py --question 1           # run just question id 1
     python run_eval.py --question 5 --verbose # + full input/context/response/reference per case
-    python run_eval.py --list                 # print status of all 12, run nothing
+    python run_eval.py --list                 # print status of all 11, run nothing
 """
 
 from __future__ import annotations
@@ -352,8 +353,8 @@ def score_rag_question(question: dict, verbose: bool = False) -> None:
 # Tool-calling questions -- not scored by this file directly. The real
 # LangGraph agent (app/graph.py) exists and is what these questions run
 # against, but this runner points to each question's own standalone
-# test_qN.py script rather than re-implementing its scoring here. Q9/Q11/
-# Q13's scripts score real RAGAS ToolCallAccuracy + AgentGoalAccuracy
+# test_qN.py script rather than re-implementing its scoring here. Q9/Q11's
+# scripts score real RAGAS ToolCallAccuracy + AgentGoalAccuracy
 # WithReference (eval_tool_call_accuracy.py) plus a custom judge; Q2/Q4/
 # Q6/Q7/Q8's scripts still use only a custom PASS/FAIL judge prompt (Open
 # Items gap, not yet closed for those five).

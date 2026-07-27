@@ -1,7 +1,7 @@
 """
 Shared helper for scoring RAGAS's real `ToolCallAccuracy` and
 `AgentGoalAccuracyWithReference` metrics against this project's live
-agent (Q9, Q11, Q13) -- Open Items / Task 5 finding: these three eval
+agent (Q9, Q11) -- Open Items / Task 5 finding: these eval
 harnesses previously scored "tool_call_accuracy" and "goal_accuracy"
 (where they scored either at all) with hand-written LLM-judge PASS/FAIL
 prompts, not RAGAS's actual metric classes. This module wires in the
@@ -41,7 +41,7 @@ happened to do:
    free-text-only tool, not a defect in this implementation.
 2. This project's design (Task 2's Infrastructure table) treats
    search_filings and search_filings_exact as interchangeable for
-   "did the agent check filings," and doesn't require Q9/Q13's three
+   "did the agent check filings," and doesn't require Q9's three
    tool categories to fire in any particular order. RAGAS 0.2.15's
    ToolCallAccuracy supports neither "either of these tool names" nor
    true unordered matching directly (no strict_order toggle exists in
@@ -55,7 +55,7 @@ happened to do:
 `AgentGoalAccuracyWithReference` added alongside `ToolCallAccuracy` for
 the same reason (Open Items: PRD cited the Session 6 metal-price-agent
 notebook as precedent for using RAGAS's real agentic metric classes,
-but Q9/Q11/Q13 only ever used a custom PASS/FAIL judge prompt for goal
+but Q9/Q11 only ever used a custom PASS/FAIL judge prompt for goal
 accuracy too). API verified the same way -- fetched
 `ragas/metrics/_goal_accuracy.py` directly from the `v0.2.15` tag, not
 assumed from the newer course venv:
@@ -78,22 +78,23 @@ assumed from the newer course venv:
 
 CONFIRMED BUG, FOUND AND FIXED VIA A REAL RUN: the first version of this
 function's callers passed `eval_dataset.json`'s `expected_behavior` field
-straight through as `reference`. Real runs against Q9/Q11/Q13 (4 cases
-total) all scored exactly 0.00 -- including Q13/ALAB, where the custom
-judge PASSed all three criteria and ToolCallAccuracy scored 1.00, so the
-agent was not actually failing its goal. Root cause, confirmed by
-re-fetching `_goal_accuracy.py`'s real source: `CompareOutcomePrompt`
-expects `desired_outcome` and `arrived_outcome` to be short, symmetric,
+straight through as `reference`. Real runs against Q9/Q11 (3 cases
+total, plus Q13 at the time -- since removed, see PRD Task 1 §4) all
+scored exactly 0.00, even on cases where the custom judge PASSed all
+three criteria and ToolCallAccuracy scored 1.00, so the agent was not
+actually failing its goal. Root cause, confirmed by re-fetching
+`_goal_accuracy.py`'s real source: `CompareOutcomePrompt` expects
+`desired_outcome` and `arrived_outcome` to be short, symmetric,
 OUTCOME-voiced statements (RAGAS's own example: "A table is successfully
 booked at any Chinese restaurant for 8:00pm." vs "...at Jade Palace...").
 `expected_behavior` is written as rubric/spec prose, not an outcome
-statement -- Q13's is the worst case, literally containing "(see PRD
-Open Items)", a citation to a document the comparison LLM never sees.
+statement -- one case literally contained "(see PRD Open Items)", a
+citation to a document the comparison LLM never sees.
 That structural/lexical mismatch reads as "different" to the judge
 regardless of whether the agent actually succeeded. Fixed by having each
 test_qN.py build its own short, outcome-voiced `reference` string
 (`GOAL_REFERENCE`, formatted per case) instead of reusing
-`expected_behavior` -- see test_q9.py/test_q11.py/test_q13.py. Not yet
+`expected_behavior` -- see test_q9.py/test_q11.py. Not yet
 re-verified against a real run (this fix itself is unexecuted, same
 sandbox constraint as everything else in this file).
 

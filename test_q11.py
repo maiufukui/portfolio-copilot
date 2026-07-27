@@ -204,7 +204,7 @@ def run_case(graph, case: dict, judge_llm) -> dict:
     )
 
     # Real RAGAS AgentGoalAccuracyWithReference -- new for Q11 (Open Items
-    # fix), same gap as Q9/Q13: goal_accuracy was only ever scored by this
+    # fix), same gap as Q9: goal_accuracy was only ever scored by this
     # file's own PASS/FAIL judge prompt. Uses GOAL_REFERENCE (outcome-
     # voiced), not expected_behavior (rubric-voiced) -- see comment above.
     goal_score = score_goal_accuracy(

@@ -69,12 +69,13 @@ flowchart LR
 | 9 | "Summarize everything notable about Company X this week: filings, media, and analyst activity." | Synthesizes across all three signal categories (filings/keyword checks, Tavily media search, Finnhub institutional consensus) into one digest, each item cited to source and date. |
 | 11 | "When does Company X report next, and what should I watch for based on its current Fundamentals Health Score?" | Surfaces the next earnings date and names the specific sub-signal(s), revenue growth, margin, insider activity, leadership stability, that the upcoming report will test, especially any currently at Monitor or At Risk. |
 | 12 | "What happened across my whole portfolio this week that I should know about?" | Synthesizes across all held tickers, only surfaces items that would clear the alert-relevance threshold, cites each with source and date. A pull-based version of what a proactive digest would push. |
-| 13 | "Has anything about Company X's underlying business gotten worse since I bought it: revenue, margins, insider activity, or leadership?" | Runs the four-signal Fundamentals Health Score (Task 2 §4): reports each sub-signal's status and the overall worst-of rollup, with the specific numbers/events driving any non-intact rating. |
+
+*Question 13 (a since-purchase comparison question) was removed 2026-07-27: descoped as a use case the app deliberately does not support. Its supporting classifier (`TemporalComparisonQuestion` in `app/graph.py`) and dedicated test (`test_q13.py`) were removed from the codebase the same day.*
 
 **Evaluation methodology:** two scoring shapes, not one ad hoc LLM-judge rubric.
 
 - **RAG-answerable questions (1, 3, 5):** score with RAGAS `Faithfulness`, `LLMContextRecall`, and `FactualCorrectness` against a written reference answer, following the `SingleTurnSample` → `EvaluationDataset` → `evaluate()` pattern.
-- **Tool-calling and hybrid questions (2, 4, 6, 7, 8, 9, 11, 12, 13):** score on tool-call accuracy (did it call the right tool with the right arguments), goal accuracy (did the final answer satisfy the request), and topic adherence (did it stay grounded in the user's actual holdings/thesis rather than drifting into general advice). This is a custom LLM-judge prompt scoring PASS/FAIL against each criterion from a LangGraph trace.
+- **Tool-calling and hybrid questions (2, 4, 6, 7, 8, 9, 11, 12):** score on tool-call accuracy (did it call the right tool with the right arguments), goal accuracy (did the final answer satisfy the request), and topic adherence (did it stay grounded in the user's actual holdings/thesis rather than drifting into general advice). This is a custom LLM-judge prompt scoring PASS/FAIL against each criterion from a LangGraph trace.
 
 ## Task 2: Propose a Solution
 
@@ -91,7 +92,7 @@ Also out of scope, each for a stated reason:
 - **User accounts, holdings storage, and onboarding.** Tables B (Appendix A) and C (Appendix C) describe the intended data model; no database, auth, or onboarding form exists in the live app.
 - **Alert delivery (email/SMS) and the relevance-threshold pipeline.** Designed (Task 2 §4, Appendix C) but not implemented. Blocks eval Q12, which needs the relevance-threshold filter this pipeline would provide.
 - **Multi-user support.** The live app operates against 4 hardcoded tracked tickers (ALAB, AAPL, MRVL, NBIS), not a real multi-user, multi-portfolio system.
-- **Historical/point-in-time comparisons.** The Fundamentals Health Score is always a current-state snapshot; nothing persists, so a true "since [date]" diff isn't possible yet. Affects how eval Q13 is scored (Task 5 §1).
+- **Historical/point-in-time comparisons.** The Fundamentals Health Score is always a current-state snapshot; nothing persists, so a true "since [date]" diff isn't possible. A since-purchase comparison use case (formerly eval Q13) was evaluated and then deliberately descoped 2026-07-27 -- see Task 1 §4.
 - **Guardrail layer.** No code-enforced rail yet against unhedged buy/sell/hold language, prompt injection, or PII. See Task 7.
 - **Production parent-child retrieval.** Built and evaluated as the Task 6 advanced-retriever upgrade, but not wired into the live agent. See Task 7 and Appendix C.
 - **Multi-quarter transcript ingestion.** Only one transcript quarter exists per ticker today, blocking eval Q3. See Task 7.
@@ -245,7 +246,7 @@ Per-holding user data (ticker, shares, cost basis, purchase date, account type: 
 
 *Prepare a test data set (either by generating synthetic data or by assembling an existing dataset).*
 
-The eval dataset is `eval_dataset.json`, the same locked 12-question list from Task 1 §4. Each question carries its scoring method (`ragas_triad`, `tool_call_goal_topic`, `deterministic_assertion`, or `hybrid`), real test-case parameters against the 4 tracked tickers, and, for the 3 RAG-answerable questions (1, 3, 5), a written reference answer, not generated.
+The eval dataset is `eval_dataset.json`, the same locked 11-question list from Task 1 §4 (12 originally, minus Q13, removed 2026-07-27). Each question carries its scoring method (`ragas_triad`, `tool_call_goal_topic`, `deterministic_assertion`, or `hybrid`), real test-case parameters against the 4 tracked tickers, and, for the 3 RAG-answerable questions (1, 3, 5), a written reference answer, not generated.
 
 **Table E: Per-Question Data, Test Coverage, and Harness**
 
@@ -262,7 +263,8 @@ The eval dataset is `eval_dataset.json`, the same locked 12-question list from T
 | 9 | Built | ALAB, real deployed agent, filings + news + market data | 1 case. First run surfaced a real defect (ungrounded "no filings found" claim), fixed this session with a code-level guard. | `test_q9.py`, calls the real agent end to end; deterministic tool-category-coverage check + LLM judge for source_coverage/citation_quality/tool_call_accuracy |
 | 11 | Built | MRVL (has a real flagged signal), NBIS (insufficient_data; tests honest reporting of a real gap). Finnhub earnings calendar + health score | 2 cases deliberately exercising both paths: a real monitor/at_risk signal to surface, and a missing-data case to report honestly rather than invent. Both cases correctly cite the real next-earnings date and correctly reflect the health score's own signals. NBIS carries one known, deferred gap where a real transcript-sourced number sitting next to an insufficient_data signal isn't yet labeled as self-reported. | `test_q11.py`, precomputes the real earnings date + flagged signals in Python *before* asking the agent anything, deterministically checks the response against that known answer, plus an LLM judge for the softer criteria (see Task 5 §2) |
 | 12 | Not built `*` | Would extend Q9's orchestration across all 4 tickers | Blocked. The relevance-threshold filter it needs doesn't exist yet | none |
-| 13 | Built | ALAB, full 4-signal health score | 1 case, scored as current-state only (no health-score snapshot data exists to support a historical since-purchase diff). All 3 judge criteria passed after six fix attempts: the verdict now renders as a fixed Python block, never composed by the model, and narrative is fed only raw structured numbers with the question text excluded, so there's nothing for the model to mirror. | `test_q13.py`, precomputes the real 4-signal health score in Python before asking the agent anything, deterministically checks all 4 signals are addressed and the worst-of rollup matches, plus an LLM judge for the softer criteria (see Task 5 §2) |
+
+*Question 13 removed 2026-07-27 -- see Task 1 §4.*
 
 ### 2. Evaluation Harness
 
@@ -271,9 +273,9 @@ The eval dataset is `eval_dataset.json`, the same locked 12-question list from T
 | Question type | Questions | Scored by |
 |---|---|---|
 | RAG-answerable | 1, 3, 5 | RAGAS triad (`Faithfulness`, `LLMContextRecall`, `FactualCorrectness`) against a hand-written reference answer. Q5 specifically forces the keyword/exact-match retrieval path instead of vector search, since that's the mechanism being tested. |
-| Tool-calling / hybrid | 2, 4, 6, 7, 8, 9, 11, 12, 13 | Tool-call accuracy, goal accuracy, and topic adherence from a LangGraph trace. A custom PASS/FAIL LLM-judge prompt, *not* RAGAS's actual `ToolCallAccuracy`/`AgentGoalAccuracyWithReference`/`TopicAdherence` classes. Q8 and Q13 also carry a deterministic check: the exact number is computed in Python first, and the harness verifies the model's answer against that number rather than judging whether the prose merely sounds right. |
+| Tool-calling / hybrid | 2, 4, 6, 7, 8, 9, 11, 12 | Tool-call accuracy, goal accuracy, and topic adherence from a LangGraph trace. A custom PASS/FAIL LLM-judge prompt, *not* RAGAS's actual `ToolCallAccuracy`/`AgentGoalAccuracyWithReference`/`TopicAdherence` classes. Q8 also carries a deterministic check: the exact number is computed in Python first, and the harness verifies the model's answer against that number rather than judging whether the prose merely sounds right. |
 
-**The core pattern: compute the real answer first, then check the model against it, not just whether it sounds plausible.** For Q11 and Q13, the harness precomputes a known-correct answer via the live agent's own tools (`get_fundamentals_health_score`, `fetch_next_earnings_date`) before asking anything, then checks the response two ways: a hard mechanical pass (right date, right flagged signals, right overall status) and a narrower LLM-judge pass for what can't be string-matched (grounded reasoning, no overclaiming, honest framing).
+**The core pattern: compute the real answer first, then check the model against it, not just whether it sounds plausible.** For Q11, the harness precomputes a known-correct answer via the live agent's own tools (`fetch_next_earnings_date`, health-score signals) before asking anything, then checks the response two ways: a hard mechanical pass (right date, right flagged signals, right overall status) and a narrower LLM-judge pass for what can't be string-matched (grounded reasoning, no overclaiming, honest framing).
 
 ### 3. Conclusions
 
@@ -286,7 +288,7 @@ The eval dataset is `eval_dataset.json`, the same locked 12-question list from T
 
 One metric didn't track the improvement: RAGAS's `FactualCorrectness` (F1) stayed flat or dipped slightly on both Q1 and Q5 despite better-sourced responses, likely because its atomic-claim scoring penalizes detail a terse hand-written reference omits.
 
-Separately, RAGAS's `AgentGoalAccuracyWithReference` proved low-precision for status-heavy questions: it preserves *topics* but not *status words*, so Q13/ALAB's correct "at risk" call scored "different" for not repeating the reference's exact phrase "worst-of status". The custom PASS/FAIL judge criteria remain primary for status-accuracy; this metric is now secondary only.
+Separately, RAGAS's `AgentGoalAccuracyWithReference` proved low-precision for status-heavy questions generally: it preserves *topics* but not *status words*, so a correct "at risk" call can score "different" for not repeating a reference's exact status phrasing. The custom PASS/FAIL judge criteria remain primary for status-accuracy; this metric is now secondary only.
 
 **Bottom line:** every fix that helped this session, parent-child retrieval and the Q5 dedup fix, targeted what reaches the model, not how it reasons, the throughline into Task 6's improvements below.
 
@@ -328,26 +330,23 @@ Separately, RAGAS's `AgentGoalAccuracyWithReference` proved low-precision for st
 
 ### 3. A Change to Another Piece of the Solution
 
-Both are synthesis-layer fixes, distinct from Task 6 §1-2's retrieval work, each with real before/after evaluation evidence.
+A synthesis-layer fix, distinct from Task 6 §1-2's retrieval work, with real before/after evaluation evidence.
 
-- **Change A: Q9's filings-relevance guard.**
+- **Change: Q9's filings-relevance guard.**
   - *Problem:* on a "summarize everything" question, the agent could skip the filings tool entirely and still tell the user "no new filings were found," an unchecked claim stated as fact.
   - *Fix:* if a question needs a filings check and the agent's trace shows none happened, the app runs the filings search itself and corrects the answer before it's sent. A classifier now decides which questions need that check, replacing an earlier keyword list that kept missing reworded questions.
   - *Evidence:* re-testing against ALAB confirmed all three judged criteria (source coverage, citation quality, tool-call accuracy) now pass, with real filing citations alongside full market/news/analyst detail.
-- **Change B: Q13's narrative decoupling.**
-  - *Problem:* Q13 ("has anything gotten worse since I bought it") kept producing a false since-purchase comparison the app has no data to support. The model was mirroring the wording of the user's own question, a habit no prompt instruction could reliably override.
-  - *Fix:* take the model out of that decision. The health score's verdict is now generated directly by code, never composed by the model, and the supporting narrative is written from raw data alone, with the question text left out so there's nothing left to mirror.
-  - *Evidence:* a re-run confirmed all three judge criteria pass, including honest framing, which had failed five times before.
+  - *Status:* live in `app/graph.py` (`_question_needs_filings_check`), unaffected by the 2026-07-27 removal of the separate Q13/temporal-comparison classifier below.
 
-Both are synthesis-layer fixes, distinct from Task 6 §1-2's retrieval work, each with real before/after evaluation evidence.
+*A second synthesis-layer change (Q13's narrative decoupling) previously documented here was removed 2026-07-27 along with the underlying use case -- see Task 1 §4. This section's remaining evidence (Q9's fix) stands on its own for this rubric item.*
 
 ## Task 7: Next Steps
 
 **Keep:**
 
 - **The 4-tool agent architecture (Qdrant RAG, keyword/exact search, Tavily, Finnhub/EDGAR).** Each tool answers a genuinely different question shape, semantic similarity, exhaustive recall, live/current information, and structured numeric lookup, a deliberate design already deployed and eval-tested against all 4 shapes. *How:* no change needed.
-- **The Fundamentals Health Score's worst-of (not averaged) rollup.** A real product decision, not an eval-passing shortcut, so a healthy revenue trend never dilutes away a genuine leadership red flag; `test_q13.py`'s `rollup_accuracy` criterion checks this directly and passes in the current verified run. *How:* no change, already implemented in `app/tools.py`'s `get_fundamentals_health_score()`.
-- **Deterministic math computed in Python, narrated by the LLM rather than computed by it (Q8, Q13).** A certification eval, or a real user's actual numbers, shouldn't have to trust probabilistic output for an exact number. *How:* no change; the pattern (`compute_trend_deltas` for Q8, equivalent logic for Q13) should be the default for every future numeric-answer question.
+- **The Fundamentals Health Score's worst-of (not averaged) rollup.** A real product decision, not an eval-passing shortcut, so a healthy revenue trend never dilutes away a genuine leadership red flag. *How:* no change, already implemented in `app/tools.py`'s `get_fundamentals_health_score()`. (Previously also verified by `test_q13.py`'s `rollup_accuracy` criterion; that test was removed 2026-07-27 along with Q13 -- the rollup logic itself is untouched and still live.)
+- **Deterministic math computed in Python, narrated by the LLM rather than computed by it (Q8).** A certification eval, or a real user's actual numbers, shouldn't have to trust probabilistic output for an exact number. *How:* no change; the pattern (`compute_trend_deltas` for Q8) should be the default for every future numeric-answer question.
 - **Provider-side prompt caching + bounded LRU/TTL tool caches.** Cheap and mechanically verified (cache hit/miss instrumented via `tools.cache_stats`), with no real downside once traffic exceeds a single demo session. *How:* no change, already applied in `app/graph.py`/`app/tools.py`.
 
 **Change:**
@@ -355,10 +354,10 @@ Both are synthesis-layer fixes, distinct from Task 6 §1-2's retrieval work, eac
 - **Add the guardrail layer.**
   - *What:* "never present a calculation as a recommendation" (Q7) is enforced only by the system prompt, with no code check.
   - *Why:* the single highest-value remaining gap for a finance-adjacent app; Q9 already proved a prompt-only fix isn't reliable enough.
-  - *How:* three pieces, reusing the same plain-Python wrapper pattern already used for the Q9/Q13 fixes (one extra model call where it applies):
+  - *How:* three pieces, reusing the same plain-Python wrapper pattern already used for the Q9 fix (one extra model call where it applies):
     - An input-injection rail: keyword/regex check on the incoming question, short-circuits with a canned response if tripped.
     - A PII-redaction rail: regex-based redaction of SSNs/emails on anything logged or traced, mechanical, no model call.
-    - An output rail against unhedged buy/sell/hold language: needs a classifier rather than a keyword list, since Q9 and Q13 both showed that reworded claims slip past regex undetected.
+    - An output rail against unhedged buy/sell/hold language: needs a classifier rather than a keyword list, since Q9 showed that reworded claims slip past regex undetected.
 - **Resolve the retrieval source-preference workaround.**
   - *What:* the parent-child retriever currently uses a hardcoded rule to prefer transcript content over filing content, set by hand for one known question, not derived from the question at runtime.
   - *Why:* it doesn't generalize past that one case, and blocks promoting parent-child retrieval into the live agent with confidence.
@@ -376,7 +375,7 @@ Both are synthesis-layer fixes, distinct from Task 6 §1-2's retrieval work, eac
   - *Why:* Task 6 §2's evaluation evidence (perfect, stable context recall vs. an inconsistent baseline) makes the case to move it from tested to shipped.
   - *How:* resolve the source-preference workaround above first, then swap the live retriever over and re-run the full eval suite to confirm nothing regresses.
 - **Make the custom PASS/FAIL judge criteria scalable.**
-  - *What:* the custom judge exists because RAGAS's real agentic classes are a low-precision signal for this project's status-heavy questions. It's rigorous for a locked 12-question set, but doesn't scale: every new question needs a hand-written reference and rubric.
+  - *What:* the custom judge exists because RAGAS's real agentic classes are a low-precision signal for this project's status-heavy questions. It's rigorous for a locked 11-question set, but doesn't scale: every new question needs a hand-written reference and rubric.
   - *Why:* a real, disclosed gap between "passes certification" and "production-ready eval."
   - *How:* four options, not mutually exclusive:
     - Calibrate the LLM-judge against a gold-labeled set and track agreement with human raters.
@@ -394,9 +393,9 @@ The actual success metric right now is these 4 questions working end-to-end thro
    - *Status:* **PASSED, confirmed against the real live agent 2026-07-26.** Real output correctly caught the discrepancy between the stated "-12%" and the actual weekly move (-8.82%, verified via `get_market_data` rather than taking the claim at face value), surfaced the real insider-selling activity and the at_risk health score, and closed with "the decision to sell should also consider your investment goals and risk tolerance" -- a hedged answer, not a bare buy/sell/hold recommendation. Decision made 2026-07-26: the guardrail layer (Task 7's "Add the guardrail layer") is confirmed NOT needed for this specific demo question and is being held/deferred, not built under time pressure -- it remains the right long-term fix (Task 7 still tracks it), just not demo-critical given this passed as-is.
 2. **Deep RAG grounded in filings.** "Does ALAB rely heavily on any single customer for revenue -- is any one customer a majority?"
    - *Status:* **PASSED, confirmed against the real live agent 2026-07-26** after one reword. Original wording produced a legitimate-pass answer that missed the dramatic stat (see below); this reworded version's real output correctly states "one end customer represented more than 70% of its revenue in 2025... the top three end customers collectively accounted for approximately 86%," sourced to the 10-K. Note even the improved `search_filings_exact` keyword list still didn't hit this sentence on this run (it needed 2 tries and still came up short) -- `search_filings`'s semantic search is what ultimately found it. Minor, non-blocking observation, not worth chasing further: exact-keyword search may just not be reliable for sentences like this one regardless of keyword choice, since the sentence never contains any generic "concentration" phrase, only the specific number.
-3. **Multi-document / quarter synthesis.** "ALAB's gross margin has been bouncing around the last few quarters -- up, down, up again. What's driving that, and is the guided dip next quarter more of the same, or something different?"
-   - *Status:* **PASSED, confirmed against the real live agent 2026-07-26.** Root cause and fix: `app/graph.py`'s `TemporalComparisonQuestion` classifier was flagging this question `True`, misrouting it into `_compose_grounded_narrative` -- a composer built for a different bug (Q13's "since I bought it" mirroring) that by design forces a fixed one-paragraph-per-signal template and never receives the original question text, so it was structurally incapable of engaging with "is the guided dip more of the same, or different" regardless of what data it had. Added an explicit False few-shot example to `_TEMPORAL_QUESTION_PROMPT` for this question shape (same narrow pattern as two prior real fixes to this classifier, for Q9 and Q7). Rerun confirms: classifier now returns `False`, and the real answer directly engages with the comparison -- "the guided dip next quarter is somewhat different because it includes a one-time non-cash charge related to a customer agreement, in addition to any product mix effects."
-   One smaller, remaining precision issue, disclosed rather than silently accepted: the answer's summary sentence ("the recent up-down-up pattern... is mainly due to product mix changes") generalizes the Q1-specific documented cause across all 3 quarters' moves, without explicitly flagging that the earlier two moves (Q3 2025 +41bps, Q4 2025 -68bps) have no call commentary behind them anywhere in the retrieved data. Each individual bullet in the answer is correctly and specifically sourced -- this is a mild overreach in one summary sentence, not a fabricated fact -- but it's exactly the "don't generalize past what's grounded" test this question was designed to catch, and it doesn't fully pass that bar. Decision: accepted as a real pass given time constraints; a follow-up tightening (explicit instruction not to generalize a single period's cause across a described multi-period pattern) is a good candidate for Task 7's Next Steps, not blocking the demo.
+3. **Multi-document / quarter synthesis.** Current wording (2026-07-27, superseding the margin-bouncing wording below): "Revenue growth has slowed for several quarters straight -- does the latest quarter suggest that's stabilizing, or is a bigger slowdown coming?"
+   - *Status:* untested against a real (non-bypassed) agent run. The only real run on record for this wording used `DISABLE_TEMPORAL_CLASSIFIER` (`q3_nocls.txt`), which forced the now-deleted classifier to skip -- as of 2026-07-27 that's simply the only path (the classifier and its misrouting branch are gone from `app/graph.py`), so a fresh live run would exercise real current behavior for the first time. Recommended before treating this as passing: `python -m app.graph --ticker ALAB --question "Revenue growth has slowed for several quarters straight -- does the latest quarter suggest that's stabilizing, or is a bigger slowdown coming?" --verbose`.
+   - *Prior wording, for the record:* "ALAB's gross margin has been bouncing around the last few quarters -- up, down, up again. What's driving that, and is the guided dip next quarter more of the same, or something different?" -- **PASSED against the real live agent 2026-07-26**, at the time via a fix to the since-removed `TemporalComparisonQuestion` classifier (it had been misrouting this question into a composer that couldn't see the question text). That specific failure mode is now structurally impossible -- every question always takes the normal agent path -- so this historical fix no longer applies, but is kept here as the record of why the wording changed.
 
 **Stretch / nice-to-have, deferred until 1-3 are confirmed working:**
 
@@ -508,6 +507,83 @@ This session's work -- persistent embedding cache, RRF hybrid retrieval (Item 7)
 - Confirmed via today's dry run: every one of the 6 tracked tickers' 8-Ks falls back to a whole-document parent.
 - **Impact: likely low.** Each ticker's 8-K in `Data/` is a short, one-off event disclosure (3-5K chars), not the kind of source a driver/guidance question needs. Not prioritized.
 
+### Item: spec for auto-triggering ingestion from Add Holding on an untracked ticker (2026-07-27)
+
+Spec only -- not built, not approved to build. Written in response to a direct request to scope
+this out; no code has been touched.
+
+**Today's actual gate.** `POST /holdings` (`server.py`) and `PUT /holdings/{ticker}` both 400 on
+any ticker not already a key in `TICKER_TO_COMPANY`. The frontend's Add Holding ticker field is
+presumably a closed-set control reading that same list. An unmapped ticker is rejected outright,
+not accepted-then-ingested. "Can a user onboard a ticker outside the 6 already ingested?" is
+already flagged as an open decision above (line 454); this item is the answer to "what would it
+take" if the decision is yes-with-real-ingestion rather than restrict-to-6.
+
+**This is five separate pieces of work, not one:**
+
+1. **Frontend.** The ticker field has to change from a closed `<select>` to free text (or a
+   search-plus-add pattern), since the entire point is accepting a ticker not yet in
+   `TICKER_TO_COMPANY`.
+2. **Backend validation.** `POST /holdings`'s current check (`if ticker not in TICKER_TO_COMPANY:
+   raise 400`) has to branch: recognized ticker -> proceed as today; unrecognized -> kick off
+   ingestion instead of rejecting.
+3. **The ingestion pipeline itself.** `ingest_ticker.py` already wires EDGAR filings +
+   transcript into one call and resolves the real CIK from SEC's `company_tickers.json` -- but by
+   explicit, disclosed design it does **not** touch `fetch_xbrl_financials.py`'s `TICKER_TO_CIK`
+   or `app/tools.py`'s `TICKER_TO_COMPANY`. Its own docstring: *"refactoring either into something
+   dynamic under time pressure, without a real test pass against that live path, would trade a
+   small avoided dict edit for real risk to a tested, load-bearing piece of the app."* Both dicts
+   are imported directly into the live agent's per-query path (`get_fundamentals_health_score`,
+   called on every chat turn, plus `search_filings` and the `/tickers` endpoint). Wiring Add
+   Holding to *actually* work end-to-end for a new ticker means confronting that decision head-on
+   -- see options below, this is the crux of the whole item.
+4. **Timing/UX.** Real ingestion is a live EDGAR fetch, a Tavily-driven transcript search/scrape,
+   and embedding the new corpus -- not instant. Realistically tens of seconds to a couple of
+   minutes per ticker, not a synchronous request a browser should block on. The Add Holding flow
+   needs either a background job + polling/status state, or to accept the holding immediately and
+   surface "still indexing" until ready.
+5. **Failure handling.** `fetch_transcripts.py`'s QA gate exists because an ungated scrape can
+   silently ingest garbled text that still gets cited as "the transcript." Auto-triggering
+   ingestion from a public-facing form means that gate's failure path needs a real user-visible
+   outcome -- holding added but flagged "data incomplete" -- not a silent bad ingest that later
+   shows up as a confidently-wrong chat answer.
+
+**The real decision is #3. Three options, not mutually exclusive with the other four pieces:**
+
+- **(a) Fully automatic.** `POST /holdings` on an unmapped ticker triggers `ingest_ticker.py`'s
+  pipeline (as a background job) and then also auto-writes the resolved CIK/company name into
+  `TICKER_TO_CIK` and `TICKER_TO_COMPANY` at runtime. Fastest path to a real self-serve "add any
+  ticker" experience. Directly reverses the "not done, deliberately" decision above, and inherits
+  the exact risk that decision was written to avoid -- mutating a load-bearing, per-query dict
+  without a full test pass against the live agent path.
+- **(b) Semi-automatic.** Trigger ingestion automatically (filings, transcript, CIK resolution),
+  but stop short of auto-writing the live dicts -- surface the resolved CIK/company name back to
+  an operator (log line, or a response field) for the existing one-line manual edit + redeploy.
+  Preserves the original safety rationale untouched. Real cost: a ticker added this way doesn't
+  actually work in chat/dashboard until that manual step lands and the server restarts, so "Add
+  Holding" wouldn't fully deliver on its own promise without a human step in between.
+- **(c) Dynamic ticker registry.** Replace the hardcoded `TICKER_TO_CIK` / `TICKER_TO_COMPANY`
+  dicts with a persisted, DB-backed registry (natural extension of the new `holdings` table's own
+  Postgres store) that can be safely mutated at request time without redeploying static code. This
+  removes the root cause (a) is risky, rather than working around it. Real new surface area:
+  schema design, a migration path off two long-standing hardcoded dicts that `get_fundamentals_health_score`
+  and `search_filings` both import directly today, and a full test pass against that live path --
+  exactly the work the original decision was avoiding under time pressure, just done properly
+  instead of skipped.
+
+**Decision (2026-07-27): (c) approved** -- dynamic, DB-backed ticker registry, replacing the
+hardcoded `TICKER_TO_CIK` / `TICKER_TO_COMPANY` dicts, for the write problem specifically. (a) and
+(b) are ruled out.
+
+**What this decision covers, and what it doesn't.** This approves the *approach for piece #3*
+(the registry/write problem) only -- it does not by itself approve building the other four pieces
+(#1 frontend free-text field, #2 backend validation branch, #4 background-job/polling UX, #5 QA
+-gate failure surfacing) or greenlight starting implementation. Each of those still needs its own
+scoping pass and go-ahead before code changes start, per this project's working agreement -- a
+decision on one piece of a five-piece spec isn't a general go-ahead on the rest.
+
+**Status:** spec, with the (c) decision now recorded. No implementation started.
+
 ## Appendix: Data Requirements & Supplementary Detail
 
 *Supporting detail: minimum onboarding data set, competitive landscape, and post-MVP data roadmap. Appendix B (competitive landscape) is worth reading directly.*
@@ -550,12 +626,12 @@ None of the above continuously check a user's specific holdings against objectiv
 | Render Cron Job (scheduler) | Triggers the proactive monitoring loop when a new filing or news item matches a watchlist | Not built. The live app has no proactive path at all (see Task 2 §1.1); this has to exist before alerts below can fire at all |
 | Resend (email alerts) | Primary alert channel once the proactive loop above exists | Free tier (3,000/mo) comfortably covers a single user's volume, no cost to justify for MVP. Not built; no Resend integration exists in the deployed app (see Task 2 §1.1) |
 | SMS alerts (Twilio) | Upgrade channel once email adoption is validated | Real per-message cost vs. free email. Email covers the same job for v1 |
-| Postgres-backed memory (semantic + episodic) | Durable memory across restarts: **semantic memory** (durable user facts like risk tolerance/alert sensitivity, Table C columns) and **episodic memory** (a 24–48h news-dedup cache). Also a history of past Fundamentals Health Score computations (would unlock a true point-in-time "since you bought it" comparison for eval Q13) | In-memory `MemorySaver` checkpointer sufficient for MVP (see Task 2 §2 for what this does and doesn't survive); no database exists anywhere in the deployed app (see Task 2 §1.1). Migrate once persistence needs are proven. Procedural memory has no product driver in MVP scope and isn't tracked here. |
+| Postgres-backed memory (semantic + episodic) | Durable memory across restarts: **semantic memory** (durable user facts like risk tolerance/alert sensitivity, Table C columns) and **episodic memory** (a 24–48h news-dedup cache) | In-memory `MemorySaver` checkpointer sufficient for MVP (see Task 2 §2 for what this does and doesn't survive); no database exists anywhere in the deployed app (see Task 2 §1.1). Migrate once persistence needs are proven. Procedural memory has no product driver in MVP scope and isn't tracked here. A history of past Fundamentals Health Score computations (which would have unlocked a true point-in-time comparison) is no longer a driver here -- the since-purchase comparison use case was deliberately descoped 2026-07-27, see Task 1 §4. |
 | MCP tool wrapper | Standardizes tool-calling interface | Optional formalism, no grading/product benefit for v1 |
 | Parent-child retrieval, production promotion | Built and evaluated as the Task 6 advanced-retriever upgrade (`parent_child_retriever.py`, `compare_retrievers.py`), with real before/after evidence (Task 6 §2). Not wired into the live agent; `app/tools.py`'s `search_filings` tool still uses the plain flat-chunk retriever. | Blocked on resolving the source-preference hardcode first (see Task 7 Next Steps). Promoting to production without it risks misranking transcript vs. filing content on question shapes it wasn't tuned for |
 | Two-tier model routing | GPT-4.1 mini for high-frequency/tool-synthesis calls, a stronger model reserved for final answer synthesis only | MVP runs GPT-4.1 mini uniformly. Simpler to build and cheap enough that cost isn't the bottleneck yet; worth revisiting once real usage data shows where reasoning quality (not cost) is the limiting factor |
 | Competitive positioning / market share signal | e.g. "competitor won X deals," share-of-wallet shifts | No structured API exists. Only derivable from Tavily news + LLM synthesis of transcript commentary, inherently softer/more judgment-dependent than the four deterministic Fundamentals Health Score signals (Task 2 §4) |
-| Analyst estimates/price targets | Comparison layer: what does the street expect vs. what was said | Not required by any of the 12 core eval questions |
+| Analyst estimates/price targets | Comparison layer: what does the street expect vs. what was said | Not required by any of the 11 core eval questions |
 | Structured watch-conditions | User-set custom thresholds per holding, beyond the four default Fundamentals Health Score signals | Increases threshold precision further. Deferred pending validation of the default thresholds against real data |
 | Sector-concentration threshold | User-editable comfort limit | Ships with a sensible default (e.g. 30%) rather than adding onboarding friction |
 

@@ -32,8 +32,10 @@ other three (created by init_db() but not yet used) are schema only:
                              Persisting a purchase date and being able
                              to answer a since-that-date comparison are
                              two separate pieces of work.
-  - health_score_history -- schema only; wiring is Q13's since-purchase-
-                             comparison work, a separate item
+  - health_score_history -- schema only; would have wired a since-purchase
+                             comparison (formerly eval Q13), but that use
+                             case was deliberately descoped 2026-07-27 --
+                             see the PRD's Task 1 §4. No current driver.
   - user_memory          -- schema only; wiring is the guardrails/memory
                              item, a separate item
   - news_dedup           -- schema only; unused until the memory item

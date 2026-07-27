@@ -6,7 +6,7 @@ whichever of the 8 separate test_qN.py scripts' stdout happened to be
 run most recently.
 
 IMPORTANT SCOPE DISCLOSURE, found while building this (not assumed):
-of the 10 "built" questions in eval_dataset.json, only 6 have ANY real
+of the 9 "built" questions in eval_dataset.json, only 5 have ANY real
 automated scoring at all -- the rest are argparse scripts that print an
 LLM-generated answer for manual human review, with no judge, no metric,
 no PASS/FAIL, nothing to aggregate:
@@ -17,7 +17,6 @@ no PASS/FAIL, nothing to aggregate:
     Q7  (tool_calling)  -- custom PASS/FAIL judge only, test_q7_grounding.py's run_case
     Q9  (tool_calling)  -- custom judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference, test_q9.py's run_case
     Q11 (tool_calling)  -- same as Q9, test_q11.py's run_case
-    Q13 (hybrid)        -- same as Q9, test_q13.py's run_case
 
   NOT scored anywhere, not aggregated here (disclosed, not silently
   dropped -- each shows up in the scorecard with status="not_scored"
@@ -29,13 +28,17 @@ no PASS/FAIL, nothing to aggregate:
 
   Not built at all (eval_dataset.json status="not_built"): Q3, Q12.
 
+  Removed 2026-07-27: Q13 (hybrid) and its scoring script test_q13.py
+  were deleted along with the since-purchase-comparison use case they
+  tested -- see eval_dataset.json and the PRD's Task 1 §4.
+
 This is a DELIBERATELY additive wrapper, not a rewrite: every score
 here comes from calling the existing, already-verified functions in
-run_eval.py / test_q7_grounding.py / test_q9.py / test_q11.py /
-test_q13.py directly (same pattern compare_retrievers.py already uses
+run_eval.py / test_q7_grounding.py / test_q9.py / test_q11.py
+directly (same pattern compare_retrievers.py already uses
 for run_eval.py's Q1 runner) -- none of their internal scoring logic
 was touched or reimplemented, so nothing that was already confirmed
-working via a real run this session (Q9/Q11/Q13's RAGAS scores) is at
+working via a real run this session (Q9/Q11's RAGAS scores) is at
 risk of regressing here. Building a NEW judge/metric for the four
 not-yet-scored questions above is a materially bigger, riskier task
 this file deliberately does not attempt -- flagged as a real gap, not
@@ -132,14 +135,17 @@ def _score_rag_question(question: dict) -> dict:
     }
 
 
-def _score_tool_question_9_11_13(question: dict) -> dict:
-    """Q9/Q11/Q13 share the same shape: a build_graph() + run_case(graph,
+def _score_tool_question_9_11(question: dict) -> dict:
+    """Q9/Q11 share the same shape: a build_graph() + run_case(graph,
     case, judge_llm) that already returns judgment text + real
     ragas_tool_call_accuracy + ragas_goal_accuracy (the latter scored
     against each module's own outcome-voiced GOAL_REFERENCE, not
     eval_dataset.json's expected_behavior -- see test_q9.py's
     GOAL_REFERENCE comment for why that swap was necessary). Imported
-    directly from each question's own module -- not reimplemented."""
+    directly from each question's own module -- not reimplemented.
+
+    Previously also handled Q13 (test_q13.py) -- removed 2026-07-27
+    along with that question and its script; see module docstring."""
     qid = question["id"]
     from app.graph import build_graph
 
@@ -149,9 +155,6 @@ def _score_tool_question_9_11_13(question: dict) -> dict:
     elif qid == 11:
         from test_q11 import load_q11, run_case
         q = load_q11()
-    elif qid == 13:
-        from test_q13 import load_q13, run_case
-        q = load_q13()
     else:
         raise ValueError(qid)
 
@@ -222,9 +225,8 @@ SCORERS = {
     1: _score_rag_question,
     5: _score_rag_question,
     7: _score_q7,
-    9: _score_tool_question_9_11_13,
-    11: _score_tool_question_9_11_13,
-    13: _score_tool_question_9_11_13,
+    9: _score_tool_question_9_11,
+    11: _score_tool_question_9_11,
 }
 
 
