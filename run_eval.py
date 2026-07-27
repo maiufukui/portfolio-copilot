@@ -124,17 +124,22 @@ Q1_DRIVER_PROMPT = ChatPromptTemplate.from_messages(
             "You are a portfolio-monitoring assistant. Using ONLY the context "
             "below (pulled from {ticker}'s SEC filings and latest earnings "
             "call transcript), answer: what did {ticker}'s management "
-            "specifically identify as the driver behind {metric}? Quote the "
-            "exact figures/language they used. Clearly state whether this is "
-            "a backward-looking result (something that already happened) or "
+            "specifically identify as the driver behind {metric}?\n\n"
+            "Lead with the exact figure(s) management cited -- percentage, basis "
+            "points, or dollar amount, exactly as stated in the source -- in your "
+            "first sentence, then explain the driver in one additional sentence "
+            "at most. If the context discusses multiple periods, use ONLY the one "
+            "that matches {metric} exactly -- do not blend or substitute a "
+            "different period's figures. Clearly state whether this is a "
+            "backward-looking result (something that already happened) or "
             "forward-looking guidance (something they're projecting). If the "
             "context doesn't address this, say so explicitly rather than "
             "guessing.\n\n"
             "CONTEXT:\n{context}\n\n"
-            "Respond in this format:\n"
-            "Driver: ...\n"
+            "Respond in this exact format, with no extra commentary:\n"
+            "Driver: [one sentence, leading with the exact figure(s), then the cited reason]\n"
             "Type: [Backward-looking result / Forward-looking guidance / Not addressed]\n"
-            "Source: ...",
+            "Source: [1-2 short quotes -- whichever sentence(s) actually support the answer]",
         )
     ]
 )
@@ -147,7 +152,25 @@ def run_rag_q1(case: dict) -> dict:
     Verdict/Evidence/Explanation prompt, only its generic load/retrieve
     utilities."""
     retriever = _get_cached_retriever(case["ticker"])
-    query = f"What did {case['ticker']}'s management identify as the specific driver behind {case['metric']}, for the most recently reported quarter, not the full fiscal year?"
+    # "...prefer the exact verbatim sentence..." (2026-07-26): confirmed
+    # necessary against a real case (PANW's Q4 revenue/margin outlook) --
+    # check_dell_panw_retrieval.py showed the correct chunk WAS retrieved
+    # (dense search's top 15, position 4), but Cohere's rerank still
+    # ranked a bullet-point "TAKEAWAYS" summary and a metadata/summary
+    # preamble above it in the final top 5. Different failure mode from
+    # DELL's (RRF fixes that one, see parent_child_retriever.py) -- this
+    # one is Cohere ranking a paraphrased restatement over the actual
+    # verbatim management quote, addressed here by giving the reranker an
+    # explicit signal to prefer, not by widening top_n (which would just
+    # let more context through without fixing why the ranking is wrong --
+    # and reopens the over-stuffed-context risk MAX_PARENT_CHARS was
+    # built to prevent, see parent_child_retriever.py).
+    query = (
+        f"What did {case['ticker']}'s management identify as the specific driver behind {case['metric']}, "
+        f"for the most recently reported quarter, not the full fiscal year? Prefer the exact verbatim "
+        f"sentence from management's spoken remarks over any bullet-point summary, headline takeaway, "
+        f"or restated figure elsewhere in the source."
+    )
     retrieved_docs = retriever(query, k=5)
     contexts = [d.page_content for d in retrieved_docs]
 

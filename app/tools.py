@@ -177,6 +177,15 @@ def search_filings(ticker: str, query: str) -> str:
     section -- a different period, sometimes citing a change in the
     opposite direction from the actual quarter -- outranked the correct
     quarterly source.
+
+    When asking for a driver behind a number or a guidance figure, also
+    ask for the exact verbatim sentence from management's own spoken
+    remarks, rather than a bullet-point summary, headline takeaway, or
+    restated figure elsewhere in the source. Confirmed necessary against
+    a real case (item 7, 2026-07-26): a bullet-point "TAKEAWAYS" summary
+    and a metadata/summary preamble both outranked the actual quoted
+    guidance sentence, even though the real sentence was present and
+    retrievable -- the reranker needs this explicit signal to prefer it.
     """
     retriever = _get_retriever(ticker)
     docs = retriever(query, k=5)

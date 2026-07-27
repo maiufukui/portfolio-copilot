@@ -206,9 +206,23 @@ def find_year_ago_quarter(series: list[dict], idx: int, tolerance_days: int = 35
 
 
 def classify_revenue_trend(series: list[dict]) -> dict:
-    """Task 2 section 4 thresholds. Needs at least 5 quarters (current +
-    a real prior-year comp for at least 2 of the last 4) to compute a
-    meaningful trend."""
+    """Status is decided by sequential QoQ growth direction over the
+    last 3 quarters -- asymmetric on purpose: all 3 up is required for
+    intact (hard to earn), 2-of-3 down is enough for at_risk (easy to
+    trip), everything else is monitor. Replaces the previous
+    YoY-deceleration-streak logic, which could call something "intact"
+    purely because a very high YoY rate was decelerating gently, without
+    ever checking whether revenue was actually still growing quarter to
+    quarter. yoy_growth_by_quarter is still computed and returned
+    unchanged -- the existing frontend chart reads it, and it remains
+    useful independent context -- it just no longer drives status.
+
+    Confirmed against real ALAB data (2026-07-26): QoQ deltas of
+    +20.1%/+17.4%/+14.0% across the last 3 quarters -> intact, matching
+    the prior logic's result for this ticker. Margin's equivalent
+    redesign (classify_margin_trend, below) did NOT match its prior
+    result on real data -- see that function's docstring.
+    """
     if len(series) < 5:
         return {"status": "insufficient_data", "quarters_available": len(series)}
 
@@ -227,41 +241,69 @@ def classify_revenue_trend(series: list[dict]) -> dict:
                 "note": "No quarter had a real prior-year comp within 35 days -- can't compute YoY trend yet."}
 
     recent = yoy_growth[-4:]
-    decel_streak = 0
-    for i in range(len(recent) - 1, 0, -1):
-        if recent[i]["yoy_pct"] < recent[i - 1]["yoy_pct"]:
-            decel_streak += 1
-        else:
-            break
 
-    latest = recent[-1]["yoy_pct"]
-    latest_drop = recent[-1]["yoy_pct"] - recent[-2]["yoy_pct"] if len(recent) >= 2 else 0
-
-    # Only treat the last 3 series entries as a valid consecutive-QoQ-decline
-    # check if they're actually ~90 days apart -- guards against the same
-    # class of gap bug the YoY fix above addresses, for any gap this
-    # script's Q4 derivation doesn't happen to catch.
+    # Same adjacency guard used throughout this file -- a gap between
+    # quarters (missing filing, restatement) must not get silently
+    # treated as "the next quarter" when computing a QoQ delta.
     def _is_adjacent_quarter(a: dict, b: dict) -> bool:
         return 75 <= (date.fromisoformat(b["end"]) - date.fromisoformat(a["end"])).days <= 100
 
-    qoq_declined_2 = (
-        len(series) >= 3
-        and _is_adjacent_quarter(series[-2], series[-1])
-        and _is_adjacent_quarter(series[-3], series[-2])
-        and series[-1]["val"] < series[-2]["val"] < series[-3]["val"]
-    )
+    if len(series) < 4:
+        return {"status": "insufficient_data", "quarters_available": len(series),
+                "note": "Need >= 4 quarters to compute 3 QoQ deltas.",
+                "yoy_growth_by_quarter": recent}
 
-    if decel_streak >= 3 or latest < 0 or qoq_declined_2:
+    last4 = series[-4:]
+    qoq_growth = []
+    for i in range(1, len(last4)):
+        if not _is_adjacent_quarter(last4[i - 1], last4[i]):
+            qoq_growth = []  # a gap breaks the streak -- don't compute across it
+            break
+        qoq_growth.append({
+            "period": last4[i]["end"],
+            "qoq_pct": round((last4[i]["val"] - last4[i - 1]["val"]) / last4[i - 1]["val"] * 100, 1),
+        })
+
+    if len(qoq_growth) < 3:
+        return {"status": "insufficient_data", "qoq_quarters_available": len(qoq_growth),
+                "note": "Need 3 consecutive, gap-free quarters to compute the QoQ streak.",
+                "yoy_growth_by_quarter": recent}
+
+    down = sum(1 for q in qoq_growth if q["qoq_pct"] < 0)
+    up_all = all(q["qoq_pct"] > 0 for q in qoq_growth)
+
+    if down >= 2:
         status = "at_risk"
-    elif decel_streak >= 2 or latest_drop < -15:
-        status = "monitor"
-    else:
+    elif up_all:
         status = "intact"
+    else:
+        status = "monitor"
 
-    return {"status": status, "yoy_growth_by_quarter": recent, "consecutive_deceleration_quarters": decel_streak}
+    return {"status": status, "yoy_growth_by_quarter": recent, "qoq_growth_by_quarter": qoq_growth}
 
 
 def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[dict]) -> dict:
+    """Status logic, redesigned alongside classify_revenue_trend
+    (2026-07-26): a severity override first (any single QoQ compression
+    over 400bps forces at_risk immediately, regardless of streak --
+    carried over from this function's own prior 400bps single-quarter
+    threshold, not a newly invented number), then the same asymmetric
+    QoQ-streak shape as revenue -- 2-of-3 quarters compressing is enough
+    for at_risk, all 3 expanding is required for intact, else monitor.
+    Margin keeps a severity override (revenue deliberately does not):
+    the real motivating case here is a single-quarter guidance shock
+    (a one-time customer agreement cutting ALAB's Q2 guide ~300bps),
+    which a pure 3-quarter streak would miss for two more quarters.
+
+    Confirmed against real ALAB data (2026-07-26): QoQ deltas of
+    +41bps/-68bps/+69bps across the last 3 quarters -> monitor (1 of 3
+    compressing, no severity trip) -- this is a REAL CHANGE from the
+    prior peak-relative logic's result, which read intact for the same
+    data (0 consecutive compression quarters, since the most recent
+    quarter expanded). Both are defensible reads of the same numbers;
+    monitor was chosen deliberately as more accurate given the
+    mixed/oscillating pattern, not because the prior result was wrong.
+    """
     rev_by_end = {e["end"]: e["val"] for e in revenue_series}
     margins = []
     for e in gross_profit_series:
@@ -269,14 +311,11 @@ def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[
             margins.append({"period": e["end"], "margin_pct": round(e["val"] / rev_by_end[e["end"]] * 100, 2)})
     margins.sort(key=lambda m: m["period"])
 
-    if len(margins) < 3:
-        return {"status": "insufficient_data", "quarters_available": len(margins)}
+    if len(margins) < 4:
+        return {"status": "insufficient_data", "quarters_available": len(margins),
+                "note": "Need >= 4 quarters to compute 3 QoQ deltas."}
 
     recent = margins[-4:]
-    peak = max(m["margin_pct"] for m in recent)
-    latest = recent[-1]["margin_pct"]
-    cumulative_compression_bps = round((peak - latest) * 100)
-    single_quarter_drop_bps = round((recent[-2]["margin_pct"] - recent[-1]["margin_pct"]) * 100) if len(recent) >= 2 else 0
 
     # Same adjacency guard as classify_revenue_trend -- margins here come
     # from matching revenue_series to gross_profit_series by exact end
@@ -285,27 +324,38 @@ def classify_margin_trend(revenue_series: list[dict], gross_profit_series: list[
     def _is_adjacent_quarter(a: dict, b: dict) -> bool:
         return 75 <= (date.fromisoformat(b["period"]) - date.fromisoformat(a["period"])).days <= 100
 
-    compressed_streak = 0
-    for i in range(len(recent) - 1, 0, -1):
+    qoq_deltas = []
+    for i in range(1, len(recent)):
         if not _is_adjacent_quarter(recent[i - 1], recent[i]):
-            break  # gap between these two -- don't count across it
-        if recent[i]["margin_pct"] < recent[i - 1]["margin_pct"]:
-            compressed_streak += 1
-        else:
+            qoq_deltas = []  # a gap breaks the streak -- don't compute across it
             break
+        qoq_deltas.append({
+            "period": recent[i]["period"],
+            "qoq_bps": round((recent[i]["margin_pct"] - recent[i - 1]["margin_pct"]) * 100),
+        })
 
-    if compressed_streak >= 3 or cumulative_compression_bps > 500 or single_quarter_drop_bps > 400:
+    if len(qoq_deltas) < 3:
+        return {"status": "insufficient_data", "qoq_quarters_available": len(qoq_deltas),
+                "note": "Need 3 consecutive, gap-free quarters to compute the QoQ streak.",
+                "margin_by_quarter": recent}
+
+    worst_single_drop_bps = min((d["qoq_bps"] for d in qoq_deltas), default=0)
+    down = sum(1 for d in qoq_deltas if d["qoq_bps"] < 0)
+    up_all = all(d["qoq_bps"] > 0 for d in qoq_deltas)
+
+    if worst_single_drop_bps < -400:
         status = "at_risk"
-    elif compressed_streak >= 2 or single_quarter_drop_bps > 200:
-        status = "monitor"
-    else:
+    elif down >= 2:
+        status = "at_risk"
+    elif up_all:
         status = "intact"
+    else:
+        status = "monitor"
 
     return {
         "status": status,
         "margin_by_quarter": recent,
-        "consecutive_compression_quarters": compressed_streak,
-        "cumulative_compression_bps_from_peak": cumulative_compression_bps,
+        "qoq_bps_by_quarter": qoq_deltas,
     }
 
 

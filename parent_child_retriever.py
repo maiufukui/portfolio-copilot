@@ -237,6 +237,33 @@ TITLE_CHECK_WINDOW = 60  # chars of text after "Item N. " to search for a keywor
 MIN_COVERAGE_FRACTION = 0.85
 MIN_VALID_ITEMS = 3
 
+# Item 8: content-type tagging, added after confirming a real, measured
+# regression from Item 7's RRF fusion (run_eval.py --question 1
+# --verbose, 2026-07-26). Root cause, confirmed against the actual
+# retrieved-context blocks from that run: split_filing_into_items and
+# split_transcript_into_turns both glue structural "header" content --
+# a filing's cover page / checkbox front matter, and a transcript's
+# TAKEAWAYS/SUMMARY/INDUSTRY GLOSSARY preamble -- onto whichever Item or
+# speaker turn happens to come first, rather than splitting it off on
+# its own. That combined parent is large, generic, and financial-term-
+# dense, so it out-competes the actual answer under both dense and BM25
+# search. Confirmed directly: ALAB's two Q1 cases retrieved ZERO
+# transcript content in the top 5 (all 10-Q front matter/financial
+# tables); PANW's two cases retrieved the TAKEAWAYS block plus four
+# different filings' front matter, never the real transcript body.
+# Every ticker where this doesn't happen (DELL, MRVL, NBIS) scored
+# context_recall 1.0 in that same run.
+#
+# Fix: each parent now carries a content_type; the two structural-header
+# types below are excluded from indexing entirely (never chunked,
+# embedded, or added to the BM25 index -- see build_parent_child_retriever)
+# rather than just downranked. Everything else (Item 1A risk factors,
+# Item 5, MD&A, financial statement notes, all real transcript turns)
+# is untouched and still competes normally -- this targets the two
+# specific structural-header spots confirmed responsible, not a general
+# boilerplate classifier.
+EXCLUDED_CONTENT_TYPES = {"transcript_preamble", "filing_frontmatter"}
+
 
 def _normalize(text: str) -> str:
     return text.replace("’", "'").lower()
@@ -254,7 +281,13 @@ def split_filing_into_items(doc: Document) -> list[dict]:
     source = doc.metadata.get("source", "unknown")
     raw_matches = list(ITEM_PATTERN.finditer(text))
     whole_doc_fallback = [
-        {"parent_id": source, "text": text, "label": "(whole document, no Item headings found)", "source": source}
+        {
+            "parent_id": source,
+            "text": text,
+            "label": "(whole document, no Item headings found)",
+            "source": source,
+            "content_type": "filing_item",  # unclassified fallback -- not excluded, safer than risking a false-positive drop
+        }
     ]
 
     # Validate each match against that item number's known titles, and
@@ -273,17 +306,36 @@ def split_filing_into_items(doc: Document) -> list[dict]:
     if not validated:
         return whole_doc_fallback
 
+    # Item 8: the cover page / checkbox front matter before the FIRST
+    # real Item heading is now its own parent (content_type
+    # "filing_frontmatter", excluded from indexing -- see
+    # EXCLUDED_CONTENT_TYPES) instead of being glued onto whichever Item
+    # comes first. Confirmed necessary: for a 10-Q, Item 1 is "Financial
+    # Statements", so the old behavior made "Item 1" = cover page + table
+    # of contents + the entire balance sheet/income statement/notes, one
+    # giant generic parent that out-competed the real MD&A answer under
+    # both dense and BM25 search (see EXCLUDED_CONTENT_TYPES comment for
+    # the confirmed real-run evidence).
+    frontmatter_text = text[: validated[0][0].start()]
+
     segments: dict[tuple[str, str], list[str]] = {}
     for i, (m, item_num, keyword) in enumerate(validated):
-        # First validated match starts at 0, not its own match position,
-        # so any preamble/cover-page text before the first real heading
-        # is still captured somewhere rather than silently dropped.
-        start = 0 if i == 0 else m.start()
+        start = m.start()  # always the item's own heading now -- frontmatter is split off above, not glued to item 0
         end = validated[i + 1][0].start() if i + 1 < len(validated) else len(text)
         segments.setdefault((item_num, keyword), []).append(text[start:end])
 
     parents = []
-    total_captured = 0
+    total_captured = len(frontmatter_text)  # counted here so the coverage check below stays equivalent to the old behavior
+    if frontmatter_text.strip():
+        parents.append(
+            {
+                "parent_id": f"{source}::frontmatter",
+                "text": frontmatter_text,
+                "label": "(cover page / front matter)",
+                "source": source,
+                "content_type": "filing_frontmatter",
+            }
+        )
     for (item_num, keyword), candidates in segments.items():
         # Keep only the longest occurrence -- the real section body, not
         # the one-line Table of Contents mention of the same item.
@@ -291,7 +343,13 @@ def split_filing_into_items(doc: Document) -> list[dict]:
         total_captured += len(segment_text)
         label = f"Item {item_num}"
         parents.append(
-            {"parent_id": f"{source}::{label}::{keyword}", "text": segment_text, "label": label, "source": source}
+            {
+                "parent_id": f"{source}::{label}::{keyword}",
+                "text": segment_text,
+                "label": label,
+                "source": source,
+                "content_type": "filing_item",
+            }
         )
 
     # ITEM_TITLE_KEYWORDS only covers 10-K/10-Q item schemes. If it
@@ -332,24 +390,55 @@ def split_transcript_into_turns(doc: Document) -> list[dict]:
     source = doc.metadata.get("source", "unknown")
     names = _extract_speaker_names(text)
     if not names:
-        return [{"parent_id": source, "text": text, "label": "(whole transcript, no speaker list found)", "source": source}]
+        return [
+            {
+                "parent_id": source,
+                "text": text,
+                "label": "(whole transcript, no speaker list found)",
+                "source": source,
+                "content_type": "transcript_body",  # unclassified fallback -- not excluded
+            }
+        ]
 
     escaped = sorted((re.escape(n) for n in names), key=len, reverse=True)
     turn_pattern = re.compile(rf"^({'|'.join(escaped)}):\s", re.MULTILINE)
     matches = list(turn_pattern.finditer(text))
     if not matches:
-        return [{"parent_id": source, "text": text, "label": "(whole transcript, no turn markers matched)", "source": source}]
+        return [
+            {
+                "parent_id": source,
+                "text": text,
+                "label": "(whole transcript, no turn markers matched)",
+                "source": source,
+                "content_type": "transcript_body",
+            }
+        ]
 
     parents = []
+    # Item 8: the header/date/TAKEAWAYS/SUMMARY/INDUSTRY GLOSSARY preamble
+    # before the first recognized speaker line is now its own parent
+    # (content_type "transcript_preamble", excluded from indexing -- see
+    # EXCLUDED_CONTENT_TYPES) instead of being glued onto turn 0. Confirmed
+    # necessary: this preamble is exactly the bullet-point TAKEAWAYS
+    # summary that a real run showed outranking the actual verbatim
+    # transcript sentence for PANW (see EXCLUDED_CONTENT_TYPES comment for
+    # the confirmed evidence). Previously noted (before this fix) that
+    # ALAB's preamble alone was 34% of the file -- that's how much
+    # summary/glossary text was riding along with turn 0's real remarks.
+    preamble_text = text[: matches[0].start()]
+    if preamble_text.strip():
+        parents.append(
+            {
+                "parent_id": f"{source}::preamble",
+                "text": preamble_text,
+                "label": "(preamble: takeaways/summary/glossary)",
+                "source": source,
+                "content_type": "transcript_preamble",
+            }
+        )
+
     for i, m in enumerate(matches):
-        # First turn starts at 0, not its own match position, so the
-        # transcript's header/date/TAKEAWAYS preamble before the first
-        # recognized speaker line is captured somewhere rather than
-        # silently dropped (same fix, same rationale, as
-        # split_filing_into_items -- confirmed necessary here too:
-        # Data/ALAB/transcript_Q1_2026.txt's preamble was 34% of the
-        # file before this fix).
-        start = 0 if i == 0 else m.start()
+        start = m.start()  # always this speaker's own turn now -- preamble is split off above, not glued to turn 0
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         speaker = m.group(1)
         parents.append(
@@ -358,6 +447,7 @@ def split_transcript_into_turns(doc: Document) -> list[dict]:
                 "text": text[start:end],
                 "label": f"{speaker} (turn {i})",
                 "source": source,
+                "content_type": "transcript_body",
             }
         )
     return parents
@@ -384,6 +474,7 @@ def split_into_parents(documents: list[Document]) -> list[dict]:
                     "text": doc.page_content,
                     "label": f"page {page}" if page is not None else "(whole document)",
                     "source": source,
+                    "content_type": "filing_item",  # unclassified fallback -- not excluded; dead code against current data
                 }
             )
     return parents
@@ -482,7 +573,16 @@ def build_parent_child_retriever(documents: list[Document], cache_key: str | Non
         chunk_size=CHILD_CHUNK_SIZE, chunk_overlap=CHILD_CHUNK_OVERLAP, length_function=_tiktoken_len
     )
     child_docs = []
+    excluded_parent_count = 0
     for parent in parents:
+        # Item 8: hard-exclude at the indexing stage, not just at rerank
+        # time -- these parents are never chunked or embedded, so they
+        # can't consume any of the CHILD_SEARCH_K candidate slots under
+        # either dense or BM25 search, and no embedding cost is spent on
+        # them. See EXCLUDED_CONTENT_TYPES above for what's excluded and why.
+        if parent.get("content_type") in EXCLUDED_CONTENT_TYPES:
+            excluded_parent_count += 1
+            continue
         for chunk_text in splitter.split_text(parent["text"]):
             child_docs.append(
                 Document(
@@ -490,10 +590,35 @@ def build_parent_child_retriever(documents: list[Document], cache_key: str | Non
                     metadata={"parent_id": parent["parent_id"], "source": parent.get("source", "unknown")},
                 )
             )
+    if excluded_parent_count:
+        print(
+            f"[content-type filter] excluded {excluded_parent_count} parent(s) "
+            f"(transcript_preamble/filing_frontmatter) from indexing."
+        )
 
     embedding_model = OpenAIEmbeddings(model=EMBEDDING_MODEL)
     vectorstore = _load_or_build_vectorstore(child_docs, embedding_model, cache_key)
     child_retriever = vectorstore.as_retriever(search_kwargs={"k": CHILD_SEARCH_K})
+
+    # Item 7: RRF first-stage fusion, built once per ticker alongside the
+    # dense vectorstore above -- NOT rebuilt per query (see
+    # _bm25_rank_children below). Root cause this fixes, confirmed live
+    # against DELL's "this quarter's gross margin change" (2026-07-26,
+    # check_dell_panw_retrieval.py): the exact answer sentence
+    # ("Gross margin dollars increased 18% to $6,800,000,000... 20.5%...")
+    # exists verbatim in Data/DELL/transcript_latest.txt, but dense
+    # embedding search's own top 15 never included it at all -- Cohere
+    # rerank never got the chance to rank it, because it was never in the
+    # candidate pool to begin with. Exact numeric figures like this are
+    # exactly what BM25's lexical/term-frequency scoring is built to
+    # catch and dense embeddings can blur among topically-similar
+    # passages. This is a genuinely different failure mode from PANW's
+    # (confirmed same day: PANW's target chunk WAS in dense search's top
+    # 15, at position 4, but Cohere's rerank still didn't put it in the
+    # final top 5 -- a reranking problem, not a retrieval one, tracked
+    # separately via a query-wording fix, not RRF).
+    bm25_corpus_tokens = [doc.page_content.lower().split() for doc in child_docs]
+    bm25_index = BM25Okapi(bm25_corpus_tokens)
 
     def _bounded_parent_text(parent_text: str, matched_child_text: str) -> str:
         """Return parent_text unchanged if it's under MAX_PARENT_CHARS.
@@ -516,19 +641,46 @@ def build_parent_child_retriever(documents: list[Document], cache_key: str | Non
         suffix = " [...truncated...]" if end < len(parent_text) else ""
         return prefix + parent_text[start:end] + suffix
 
+    def _bm25_rank_children(question: str, k: int) -> list[Document]:
+        """First-stage sparse/lexical search over the FULL child corpus
+        for this ticker, using the bm25_index built once above (not
+        rebuilt per query -- only the query-vs-index scoring is redone
+        each call, which is cheap, local, CPU-only arithmetic). NOT the
+        same thing as _bm25_fallback_rerank below, which only reranks an
+        already-retrieved candidate set as a Cohere-outage fallback --
+        this runs independently over every child chunk, exactly parallel
+        to child_retriever's dense search, so the two can be fused."""
+        scores = bm25_index.get_scores(question.lower().split())
+        ranked_indices = sorted(range(len(child_docs)), key=lambda i: scores[i], reverse=True)
+        return [child_docs[i] for i in ranked_indices[:k]]
+
     def retrieve(question: str, k: int = 5) -> list[Document]:
-        """Search child chunks, dedupe back to unique parents (Item
-        sections / speaker turns / PDF pages), then rank those parents
-        against the actual query with Cohere Rerank -- replaces the
-        retired prefer_source_suffixes hand-coded rule (see git history),
-        which only reordered by source-file type and was, in the PRD's
-        own words, "set by hand for one known question" (Q1 case 1,
-        ALAB's gross-margin driver). This generalizes past that one case
-        instead of encoding it."""
-        child_hits = child_retriever.invoke(question)
+        """Item 7: fuses two independently-ranked first-stage searches --
+        dense/semantic (child_retriever) and sparse/lexical (BM25, via
+        _bm25_rank_children) -- via Reciprocal Rank Fusion (RRF) before
+        deduping to unique parents and ranking those parents against the
+        actual query with Cohere Rerank. RRF doesn't replace Cohere's
+        reranking; it fixes what Cohere gets to choose FROM -- a
+        candidate a document that dense search alone would never surface
+        (confirmed live for DELL, see the bm25_index comment above) gets
+        a real chance to reach Cohere instead of being silently absent
+        from the pool the whole time.
+
+        This replaces the retired prefer_source_suffixes hand-coded rule
+        (see git history), which only reordered by source-file type and
+        was, in the PRD's own words, "set by hand for one known question"
+        (Q1 case 1, ALAB's gross-margin driver). This generalizes past
+        that one case instead of encoding it."""
+        dense_hits = child_retriever.invoke(question)
+        bm25_hits = _bm25_rank_children(question, CHILD_SEARCH_K)
+        fused_children = _reciprocal_rank_fusion(
+            [dense_hits, bm25_hits],
+            key_fn=lambda d: (d.metadata.get("parent_id", ""), d.page_content),
+        )
+
         seen: set[str] = set()
         candidates = []
-        for child in child_hits:
+        for child in fused_children:
             pid = child.metadata["parent_id"]
             if pid in seen:
                 continue
@@ -537,13 +689,44 @@ def build_parent_child_retriever(documents: list[Document], cache_key: str | Non
             candidates.append(
                 Document(
                     page_content=_bounded_parent_text(parent["text"], child.page_content),
-                    metadata={"source": parent.get("source", "unknown"), "label": parent.get("label", ""), "parent_id": pid},
+                    metadata={
+                        "source": parent.get("source", "unknown"),
+                        "label": parent.get("label", ""),
+                        "parent_id": pid,
+                        "content_type": parent.get("content_type", ""),
+                    },
                 )
             )
 
         return _rerank(question, candidates, k)
 
     return retrieve
+
+
+RRF_K = 60  # standard constant from the original RRF paper (Cormack, Clarke & Buettcher 2009) --
+            # not tuned for this project specifically, used as published.
+
+
+def _reciprocal_rank_fusion(ranked_lists: list[list[Document]], key_fn, k: int = RRF_K) -> list[Document]:
+    """Fuses N independently-ranked lists into one combined ranking:
+    score(doc) = sum, over every list it appears in, of 1 / (k + rank),
+    rank being 1-indexed position in that list. A document near the top
+    of ANY one list scores highly even if it's absent from every other
+    list -- this is what lets a BM25-only hit surface into the final
+    candidate pool without dense search ever needing to find it itself
+    (and vice versa). key_fn identifies "the same document" across
+    lists -- object identity isn't reliable here since dense and BM25
+    search return separate Document instances over the same underlying
+    text, so retrieve() keys on (parent_id, page_content) instead."""
+    scores: dict = {}
+    doc_by_key: dict = {}
+    for ranked_list in ranked_lists:
+        for rank, doc in enumerate(ranked_list, start=1):
+            key = key_fn(doc)
+            scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+            doc_by_key.setdefault(key, doc)
+    fused_keys = sorted(scores, key=lambda kk: scores[kk], reverse=True)
+    return [doc_by_key[kk] for kk in fused_keys]
 
 
 def _bm25_fallback_rerank(question: str, candidates: list[Document], k: int) -> list[Document]:
