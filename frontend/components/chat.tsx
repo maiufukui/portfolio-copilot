@@ -99,17 +99,12 @@ export function Chat({ ticker, threadId }: { ticker: string; threadId: string })
       <ScrollArea className="flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
           {messages.length === 0 && (
-            <div className="mt-10 flex flex-col items-center gap-6 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                <Bot className="size-7 text-muted-foreground" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-medium">Ask about {ticker}</h2>
-                <p className="text-sm text-muted-foreground">
-                  Grounded in {ticker}&apos;s filings, live news, and market
-                  data -- not a stored thesis.
-                </p>
-              </div>
+            // No repeated avatar/heading block here -- the page-level "Ask
+            // North" header (page.tsx / portfolio's page.tsx) already
+            // covers that; this panel goes straight from header to
+            // suggestions, matching the reference design's minimal panel
+            // rather than duplicating the heading a second time.
+            <div className="mt-1 flex w-full flex-col gap-2">
               {/* Stacked, full-width, wrapped text -- not flex-wrap pills.
                   The Button component's variants force whitespace-nowrap
                   (see components/ui/button.tsx's buttonVariants), which
@@ -117,19 +112,17 @@ export function Chat({ ticker, threadId }: { ticker: string; threadId: string })
                   narrow (this chat panel is ~32% width, not the full
                   page) -- overridden here with whitespace-normal + h-auto
                   so multi-line suggestion text actually displays in full. */}
-              <div className="flex w-full flex-col gap-2">
-                {SUGGESTIONS.map((s) => (
-                  <Button
-                    key={s}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => send(s)}
-                    className="h-auto w-full justify-start text-left whitespace-normal"
-                  >
-                    {s}
-                  </Button>
-                ))}
-              </div>
+              {SUGGESTIONS.map((s) => (
+                <Button
+                  key={s}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => send(s)}
+                  className="h-auto w-full justify-start text-left whitespace-normal"
+                >
+                  {s}
+                </Button>
+              ))}
             </div>
           )}
 

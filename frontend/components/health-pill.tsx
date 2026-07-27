@@ -5,21 +5,24 @@ import { cn } from "@/lib/utils";
 // Three states, never color-only (PRD Appendix G): each state pairs a
 // color, an icon, AND a text label, so it reads correctly for colorblind
 // users and screen readers, not just sighted users scanning for color.
+// Colors are the brand spec's muted/desaturated status palette (2026-07-26),
+// not Tailwind's saturated emerald/amber/red -- referenced via the
+// --status-* CSS custom properties defined in globals.css.
 const STATUS_CONFIG = {
   intact: {
     label: "Intact",
     icon: Check,
-    className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    className: "bg-[var(--status-intact-bg)] text-[var(--status-intact-fg)]",
   },
   monitor: {
     label: "Monitor",
     icon: Minus,
-    className: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+    className: "bg-[var(--status-monitor-bg)] text-[var(--status-monitor-fg)]",
   },
   at_risk: {
     label: "At Risk",
     icon: AlertTriangle,
-    className: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+    className: "bg-[var(--status-at-risk-bg)] text-[var(--status-at-risk-fg)]",
   },
   insufficient_data: {
     label: "No data",

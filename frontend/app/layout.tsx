@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 
 // Inter -- a modern, geometric sans used across most current AI-product
@@ -14,6 +14,18 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// Fraunces -- free Google Fonts substitute for the brand spec's "Editorial
+// New" (a commercial font we don't have a license for). Used only for
+// hero numbers/headlines (portfolio value, prices, large metrics) via
+// --font-heading in globals.css -- everything else (nav, tables, body,
+// chat, buttons) stays on Inter, matching the spec's split between the
+// two typefaces.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  weight: ["500", "600"],
+});
+
 export const metadata: Metadata = {
   title: "Portfolio Copilot",
   description: "Agentic RAG assistant grounding your holdings in filings, fundamentals, and live data",
@@ -25,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

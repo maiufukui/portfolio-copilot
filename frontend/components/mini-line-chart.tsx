@@ -11,8 +11,12 @@ interface Point {
 }
 
 const WIDTH = 280;
-const HEIGHT = 100;
-const PADDING = 24;
+// Shrunk from 100/24 (Maiu, 2026-07-27) -- at 100px tall this dwarfed the
+// text-only rows (Leadership Change/Insider Activity) it sits next to in
+// dashboard.tsx's vertical signal list, breaking the row-to-row flow. 56px
+// keeps it roughly in line with those rows' natural height.
+const HEIGHT = 56;
+const PADDING = 12;
 
 export function MiniLineChart({
   points,
@@ -25,7 +29,7 @@ export function MiniLineChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex h-[100px] items-center justify-center text-xs text-muted-foreground">
+      <div className="flex h-[56px] items-center justify-center text-xs text-muted-foreground">
         Not enough data
       </div>
     );
@@ -52,11 +56,11 @@ export function MiniLineChart({
       <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {coords.map((c) => (
         <g key={c.label}>
-          <circle cx={c.x} cy={c.y} r={2.5} fill={color} />
-          <text x={c.x} y={HEIGHT - 4} textAnchor="middle" className="fill-muted-foreground" fontSize={8}>
+          <circle cx={c.x} cy={c.y} r={2} fill={color} />
+          <text x={c.x} y={HEIGHT - 3} textAnchor="middle" className="fill-muted-foreground" fontSize={7}>
             {c.label}
           </text>
-          <text x={c.x} y={c.y - 6} textAnchor="middle" className="fill-foreground" fontSize={8}>
+          <text x={c.x} y={c.y - 5} textAnchor="middle" className="fill-foreground" fontSize={7}>
             {c.value.toFixed(1)}
             {unit}
           </text>

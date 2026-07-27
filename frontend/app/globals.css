@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
   --font-mono: ui-monospace, SFMono-Regular, monospace;
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-fraunces);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,50 +49,53 @@
 }
 
 :root {
-  /* Light gray page background, white cards -- cards visually "float"
-     on the page rather than blending into it (matches the ticker-card
-     grid, health-score panel, and news panel all being separate cards).
-     0.965 (first attempt, no chroma) was too close to white (--card is
-     1 0 0) to read as gray at all. 0.93 (second attempt) fixed the
-     visibility problem but reads as a flat, heavy construction-paper
-     gray -- not the refined/premium tone being asked for now.
-     0.95 lightness keeps enough delta from white cards to stay visible,
-     with a small cool-blue chroma (0.004 at 240 hue) instead of a
-     neutral gray -- a cool undertone is the standard visual cue for
-     trust/stability in fintech UI (Stripe, Mercury, most banking
-     dashboards lean cool-gray rather than warm-gray for this reason). */
-  --background: oklch(0.95 0.004 240);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* North brand design system (2026-07-26, Maiu-specified) -- Ivory page
+     background with white cards separated by whitespace, not shadow;
+     North Navy as the single brand/primary color (no finance-green,
+     no bright blue); status colors kept deliberately muted/desaturated
+     rather than the previous saturated Tailwind emerald/amber/red. */
+  --background: #faf8f4;
+  --foreground: #161616;
+  --card: #ffffff;
+  --card-foreground: #161616;
+  --popover: #ffffff;
+  --popover-foreground: #161616;
+  --primary: #16213e;
+  --primary-foreground: #ffffff;
+  --secondary: #ffffff;
+  --secondary-foreground: #16213e;
+  --muted: #f2f0ea;
+  --muted-foreground: #6b7280;
+  --accent: #f2f0ea;
+  --accent-foreground: #16213e;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
+  --border: #e9e7e2;
+  --input: #e9e7e2;
+  --ring: #16213e;
+  --chart-1: #16213e;
+  --chart-2: #6b7280;
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #faf8f4;
+  --sidebar-foreground: #161616;
+  --sidebar-primary: #16213e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f2f0ea;
+  --sidebar-accent-foreground: #16213e;
+  --sidebar-border: #e9e7e2;
+  --sidebar-ring: #16213e;
+
+  /* Status colors -- muted/desaturated per brand spec, not the previous
+     saturated Tailwind emerald/amber/red. Consumed directly by
+     health-pill.tsx via arbitrary-value Tailwind classes. */
+  --status-intact-bg: #ddf5e7;
+  --status-intact-fg: #1f6f43;
+  --status-monitor-bg: #fff2d6;
+  --status-monitor-fg: #a56400;
+  --status-at-risk-bg: #fce4e4;
+  --status-at-risk-fg: #b42318;
 }
 
 .dark {

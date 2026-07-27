@@ -384,6 +384,130 @@ Both are synthesis-layer fixes, distinct from Task 6 §1-2's retrieval work, eac
     - Sample real production traffic via LangSmith instead of pre-writing a reference for every question.
     - Keep the deterministic-precompute pattern for high-stakes flows and accept a lighter, sampled judge for the rest.
 
+## Demo Success Criteria
+
+The actual success metric right now is these 4 questions working end-to-end through the **live agent** (`app/graph.py`), not the aggregate RAGAS score on the 12-question cert eval set. The eval set is still tracked (Task 5-7 above, Open Items Post Demo below), but it is a proxy, not the target -- this section is the target. Ticker: ALAB for all 4. Unlike the locked 12-question eval dataset, exact wording of these 4 is NOT fixed -- if a specific phrasing trips up the agent, rewording to a phrasing that reliably demonstrates the same underlying capability is an acceptable, deliberate choice, not a workaround.
+
+**Required (1-3 -- the demo does not work without these):**
+
+1. **Personalized reasoning / decision support.** "ALAB dropped 12% this week. I'm getting nervous—should I sell?"
+   - *Status:* **PASSED, confirmed against the real live agent 2026-07-26.** Real output correctly caught the discrepancy between the stated "-12%" and the actual weekly move (-8.82%, verified via `get_market_data` rather than taking the claim at face value), surfaced the real insider-selling activity and the at_risk health score, and closed with "the decision to sell should also consider your investment goals and risk tolerance" -- a hedged answer, not a bare buy/sell/hold recommendation. Decision made 2026-07-26: the guardrail layer (Task 7's "Add the guardrail layer") is confirmed NOT needed for this specific demo question and is being held/deferred, not built under time pressure -- it remains the right long-term fix (Task 7 still tracks it), just not demo-critical given this passed as-is.
+2. **Deep RAG grounded in filings.** "Does ALAB rely heavily on any single customer for revenue -- is any one customer a majority?"
+   - *Status:* **PASSED, confirmed against the real live agent 2026-07-26** after one reword. Original wording produced a legitimate-pass answer that missed the dramatic stat (see below); this reworded version's real output correctly states "one end customer represented more than 70% of its revenue in 2025... the top three end customers collectively accounted for approximately 86%," sourced to the 10-K. Note even the improved `search_filings_exact` keyword list still didn't hit this sentence on this run (it needed 2 tries and still came up short) -- `search_filings`'s semantic search is what ultimately found it. Minor, non-blocking observation, not worth chasing further: exact-keyword search may just not be reliable for sentences like this one regardless of keyword choice, since the sentence never contains any generic "concentration" phrase, only the specific number.
+3. **Multi-document / quarter synthesis.** "ALAB's gross margin has been bouncing around the last few quarters -- up, down, up again. What's driving that, and is the guided dip next quarter more of the same, or something different?"
+   - *Status:* **PASSED, confirmed against the real live agent 2026-07-26.** Root cause and fix: `app/graph.py`'s `TemporalComparisonQuestion` classifier was flagging this question `True`, misrouting it into `_compose_grounded_narrative` -- a composer built for a different bug (Q13's "since I bought it" mirroring) that by design forces a fixed one-paragraph-per-signal template and never receives the original question text, so it was structurally incapable of engaging with "is the guided dip more of the same, or different" regardless of what data it had. Added an explicit False few-shot example to `_TEMPORAL_QUESTION_PROMPT` for this question shape (same narrow pattern as two prior real fixes to this classifier, for Q9 and Q7). Rerun confirms: classifier now returns `False`, and the real answer directly engages with the comparison -- "the guided dip next quarter is somewhat different because it includes a one-time non-cash charge related to a customer agreement, in addition to any product mix effects."
+   One smaller, remaining precision issue, disclosed rather than silently accepted: the answer's summary sentence ("the recent up-down-up pattern... is mainly due to product mix changes") generalizes the Q1-specific documented cause across all 3 quarters' moves, without explicitly flagging that the earlier two moves (Q3 2025 +41bps, Q4 2025 -68bps) have no call commentary behind them anywhere in the retrieved data. Each individual bullet in the answer is correctly and specifically sourced -- this is a mild overreach in one summary sentence, not a fabricated fact -- but it's exactly the "don't generalize past what's grounded" test this question was designed to catch, and it doesn't fully pass that bar. Decision: accepted as a real pass given time constraints; a follow-up tightening (explicit instruction not to generalize a single period's cause across a described multi-period pattern) is a good candidate for Task 7's Next Steps, not blocking the demo.
+
+**Stretch / nice-to-have, deferred until 1-3 are confirmed working:**
+
+4. **Forward-looking monitoring.** "Is there anything in ALAB's latest earnings I should be worried about moving forward, especially around margin or guidance?"
+   - *Status:* reworded 2026-07-26 after a real, diagnosed miss on the first live-agent test. First run: the agent correctly avoided the unrelated 8-K (confirmed the 8-K, filed 2026-06-08, is a routine Item 5.07 annual-meeting/proxy-vote filing -- director elections, auditor ratification, say-on-pay, nothing operational), but its own `search_filings` query ("risks or concerns mentioned in the most recent earnings call...") was built entirely around the word "risk" -- so it retrieved the transcript's generic forward-looking-statements disclaimer (which says "risks and uncertainties" three times) instead of the actual Q2 guidance paragraph (200bps one-time customer agreement, no risk-adjacent vocabulary at all). A real vocabulary-mismatch in semantic retrieval, not a system bug. Fix chosen: reword the question to anchor on "margin or guidance" explicitly, which should carry through into a more content-specific `search_filings` query, rather than changing how the tool is queried in general (logged as a separate, real finding in Task 7 for after the demo -- broader query-formulation guidance affects every question, not just this one, and shouldn't be rushed in under deadline pressure). Untested against the live agent with this new wording.
+
+**Next action:** Q1 confirmed passing. Still need: Q2's full trace (first attempt was pasted truncated -- missing the actual query used and results [1]/[2], the retrieved content that matters here), Q3's first live run, and Q4's rerun with the new wording --
+```
+python -m app.graph --ticker ALAB --question "How concentrated is ALAB's revenue among a small number of customers, and is that a real risk to watch?" --verbose > q2_output.txt 2>&1
+cat q2_output.txt
+python -m app.graph --ticker ALAB --question "ALAB's gross margin has been bouncing around the last few quarters -- up, down, up again. What's driving that, and is the guided dip next quarter more of the same, or something different?" --verbose
+python -m app.graph --ticker ALAB --question "Is there anything in ALAB's latest earnings I should be worried about moving forward, especially around margin or guidance?" --verbose
+```
+Redirecting Q2 to a file and `cat`-ing it avoids terminal-scrollback truncation cutting off the start of a long trace, which is what happened on the first attempt.
+
+## Part 5: New UI, Onboarding & Portfolio Holdings
+
+Added 2026-07-26. This is documentation only -- a spec and open-decisions log for a separate agent/session to build, not a task tracked against this session's own work (which stays on the demo questions and the guardrail layer per explicit instruction). Confirmed 2026-07-26: this new UI and onboarding flow **is now part of the demo itself**, not a post-demo nice-to-have -- rebranded "North," built against two mockups (Dashboard and Portfolio pages), directional-but-near-pixel-exact per the source design.
+
+**This reverses a prior, deliberate scope decision, on purpose -- flagging explicitly, not silently.** `app/tools.py`'s `get_dashboard_data` docstring states cost basis, shares held, $ gain/loss, and % of portfolio were left out "deliberately... no data source for any of those exists anywhere in this codebase (no database, no onboarding form)," specifically to avoid fabricating numbers. That gap is now being closed on purpose via a real onboarding form -- the prior exclusion was correct given what existed at the time, not a mistake being corrected.
+
+### What the mockups show
+
+**Dashboard page:** greeting header ("Good afternoon, Maiu") with a 2-line natural-language attention summary ("Two holdings need your attention. ALAB moved to At Risk after unusual insider selling. Dell's leadership transition introduces execution risk."); portfolio value + today's $ / % change top-right; a 6-card ticker grid (ALAB, DELL, MRVL, NBIS, AAPL, PANW) each showing a 3-tier badge (At Risk / Watch / Healthy), price, $ / % change, and next earnings date; a "Portfolio Health vs. last 4 quarters" panel with 4 mini metrics + trend lines (Revenue Growth YoY, Gross Margin, Leadership, Insider Activity) computed across the whole portfolio, not per-ticker; a "Latest Evidence" feed (e.g. "ALAB director sells 40,000 shares - Reuters, 2h ago"); and a persistent right-rail "Ask North" chat panel with 3 suggested prompts plus a free-text box.
+
+**Portfolio page:** a Holdings tab (default) with columns Ticker, Shares, Cost Basis (Avg), Current Price, Market Value, Gain/Loss ($), Gain/Loss (%), and row-level edit/delete actions, plus an "Add Holding" button; summary strip above the table (Portfolio Value, Holdings count, Today's Change, Total Gain/Loss); a Performance tab (unspecified in the mockup, contents undefined); same right-rail chat panel, persistent across pages.
+
+### Confirmed specs (2026-07-26)
+
+- **Onboarding is add/edit/delete rows, nothing more** -- no wizard, no multi-step flow.
+- **4 manual inputs per holding:** Ticker, Shares, Cost Basis (Avg), Purchase Date. Current Price, Market Value, and Gain/Loss are computed, never entered.
+- **Design fidelity:** directional but near-pixel-exact against the two shared mockups -- match layout, spacing, and copy closely, not just the general idea.
+
+### Key technical next steps
+
+**Data model.** No holdings table exists anywhere today -- `app/db.py` has 4 tables (`price_snapshots`, wired; `health_score_history`, `user_memory`, `news_dedup`, schema-only). Needs a new `holdings` table: ticker, shares, cost_basis_avg, purchase_date, at minimum. Open decision below on primary key shape.
+
+**Backend / API (`server.py`).** New CRUD endpoints: list holdings, create, update, delete. Needs input validation -- see the ticker-scope open decision below, since the RAG/health-score pipeline only has ingested data for 6 tickers (ALAB, AAPL, MRVL, NBIS, PANW, DELL).
+
+**Computed metrics.** Market Value = shares x current price. Gain/Loss $ = Market Value - (shares x cost_basis_avg). Gain/Loss % = Gain/Loss $ / (shares x cost_basis_avg). Today's $ change = shares x (current price - previous close). All of this should follow the project's existing "deterministic math in Python, narrated by the LLM" pattern (Task 7's "Keep" list, `compute_trend_deltas`-style) -- not a new pattern to invent. Current price already available via the existing Finnhub quote fetch (`fetch_quote`, used in `get_dashboard_data`).
+
+**Portfolio-level health rollup (new capability, not yet defined anywhere).** The mockup's "Portfolio Health vs. last 4 quarters" panel aggregates Revenue Growth / Gross Margin / Leadership / Insider Activity across all holdings into single portfolio-wide numbers and trend lines. The existing `get_fundamentals_health_score` is per-ticker only. Needs a real design decision: average across holdings, weight by position size, or worst-of (matching the per-ticker rollup's existing worst-of philosophy)? Not specified in the mockup or anywhere else -- pick deliberately, don't default silently.
+
+**"Why flagged" narrative generation (new, not built).** The dashboard's 2-line attention summary and per-ticker badges imply a synthesis step that turns structured signals into a specific, natural-language callout ("unusual insider selling," "leadership transition introduces execution risk") -- this doesn't exist yet. Same "Python computes, LLM narrates" pattern applies; the narration prompt itself is new.
+
+**Chat panel integration.** "Ask North" is a persistent right-rail chat, not the current CLI-oriented single-shot `python -m app.graph` pattern. Needs the existing FastAPI server + LangGraph `MemorySaver` thread continuity wired into a persistent frontend component, plus ticker-context awareness (the mockup's placeholder "Ask about ALAB..." and suggested prompts imply the panel knows which ticker is in view).
+
+**New pages/nav.** Sidebar shows Dashboard, Portfolio, Discover, Settings, Profile. Only a dashboard view exists in `frontend/components/` today (`dashboard.tsx`) -- Portfolio, Discover, Settings, and Profile are all new routes/pages.
+
+**Rebrand.** "North" name/logo, new sidebar-nav shell, new visual language (cards, badges, color system) across the whole app -- broader than a single-page skin change.
+
+### Open decisions, not yet resolved -- flag to whoever picks this up, don't default silently
+
+- **One holding per ticker, or multiple lots?** The mockup shows exactly one row per ticker (6 tickers, 6 rows). Simpler schema and average-cost math if each ticker has at most one holding row (ticker as primary key); more correct but more complex if a user can log multiple buy lots of the same ticker at different prices/dates. Pick one on purpose.
+- **Can a user onboard a ticker outside the 6 already ingested?** Live price/value math would work for any Finnhub-covered ticker, but the RAG/filings health-score grounding only exists for ALAB, AAPL, MRVL, NBIS, PANW, DELL. Either restrict onboarding to those 6, or clearly degrade (price/value works, health score and chat grounding don't) for anything else.
+- **Performance tab contents** -- entirely unspecified in the mockup.
+
+## Open Items Post Demo
+
+Living log of known gaps, bugs, and unresolved findings, kept separate from Task 5-7's graded historical numbers above. Read this section directly; don't trust a stale summary of it. Each item dated to the session it was found in.
+
+### Latest status (2026-07-26)
+
+This session's work -- persistent embedding cache, RRF hybrid retrieval (Item 7), content-type exclusion (Item 8) -- is **uncommitted**. The embedding cache is done and safe to ship. RRF and content-type exclusion are not: both were evaluated against real RAGAS scores on the 12-case Q1 eval set, and neither is currently in a state worth shipping.
+
+**Real RAGAS runs this session, in order (12-case Q1 eval, `run_eval.py --question 1`):**
+
+| Run | Faithfulness | Context Recall | Factual Correctness (F1) |
+|---|---|---|---|
+| Loosened-prompt-only (last committed-safe checkpoint) | 0.8598 | not isolated as a metric in that run's summary | 0.4750 |
+| + RRF (Item 7) + PANW query-wording fix | 0.8794 | 0.5833 | 0.3875 |
+| + content-type exclusion (Item 8) | 0.8924 | 0.5000 | 0.2992 |
+| + content-type exclusion, identical re-run (no code changed) | 0.9676 | 0.4167 | 0.3233 |
+
+**Bottom line: each fix this session made the aggregate `factual_correctness` score worse, not better**, despite each one fixing a real, individually-confirmed case (DELL's two cases went 0.00 → 0.91 and 0.00/0.18 → 0.22-0.52 across these runs, a genuine, repeatable win). Every fix's case-level win is being offset by regressions elsewhere. This is the opposite of Task 6's original parent-child retrieval result (which improved every metric cleanly, see Task 6 §2) -- these later fixes are narrower, and each has carried a real, confirmed cost somewhere else in the eval set.
+
+### Item: content-type exclusion (Item 8) did not fix ALAB/PANW and introduced a confirmed new regression
+
+- **What was tried:** exclude two structural-noise content types -- a transcript's TAKEAWAYS/SUMMARY/GLOSSARY preamble, and a filing's cover-page front matter -- from the retrieval candidate pool entirely (never chunked or embedded). Root cause was confirmed directly from real retrieved-context blocks in the prior (Item 7) run: ALAB's top-5 was 100% SEC filing boilerplate, and PANW's top-5 was the TAKEAWAYS block plus four filings' front matter, neither ticker surfacing any real transcript body content.
+- **Result, confirmed via real RAGAS run (2026-07-26):** ALAB's both cases and PANW's both cases are at `context_recall` 0.0 after this fix, stable across two identical re-runs. Removing the confirmed noise was not sufficient on its own to surface the real transcript content into the top 5 for either ticker.
+- **New regression, confirmed real (not noise):** MRVL's "this quarter's data center revenue growth" case scored `context_recall` 1.0 in the prior (Item 7) run, then 0.0 in both the first content-type run AND an identical, no-code-change re-run. Stable at 0.0 across two repeats after the change, versus stable at 1.0 before it -- by elimination, attributable to Item 8, since nothing else changed between those runs.
+- **Working hypothesis, not yet confirmed:** BM25's scoring depends on term-frequency statistics computed across a ticker's *entire* child-chunk corpus. Removing ~2-5% of each ticker's chunks (the excluded content types) changes those corpus-wide statistics for every query against that ticker, not just queries that touch the excluded content -- this could explain an unrelated regression on MRVL as a side effect of re-indexing, not a query-specific cause. Not yet confirmed with a direct before/after diff of MRVL's actual top-15 (see `diagnose_regression.py`, written but not yet run).
+- **Status: unresolved, not committed.** Structural noise was a real, confirmed problem worth removing on its own merits, but it is not the (or not the only) explanation for why ALAB's and PANW's real answers don't rank in the top 5. Root cause there is still open.
+
+### Item: the eval pipeline itself has real run-to-run non-determinism (new finding, 2026-07-26)
+
+- Two identical re-runs of `run_eval.py --question 1` (same code, same corpus, same query) produced different `context_recall` scores for NBIS's "this quarter's adjusted EBITDA margin change" case: 1.0 in the first run, 0.0 in the immediate repeat.
+- Retrieval itself should be deterministic here (embeddings and BM25 scoring give the same result on identical text/query with no randomness upstream) -- so the most likely source is either Cohere Rerank's exact ordering of near-tied candidates, or RAGAS's `LLMContextRecall` judge (an LLM call) landing differently on a borderline case, not the retriever finding different content each time.
+- **Practical implication:** any single-run score change of small-to-moderate size should be treated as possibly noise, not a confirmed effect, unless it holds across a repeat run. ALAB's, PANW's, MRVL's, and DELL's results above are each confirmed stable across at least two runs; several smaller swings elsewhere in this session's numbers have not been double-checked this way and should be read with that caveat.
+- **Not yet investigated further:** whether this is Cohere-side or RAGAS-judge-side. Would need a repeat run with the LLM judge's temperature/seed fixed (if configurable) or a direct log of Cohere's raw rerank scores across repeats to isolate which one.
+
+### Item: DELL's SEC filings get zero Item-level splitting (regex/data-shape mismatch)
+
+- `ITEM_PATTERN` (`Item\s+(\d{1,2}[A-Z]?)\.\s` in `parent_child_retriever.py`) was written and validated against ALAB's filing HTML, which formats real headings as "Item 1A. Risk Factors" (word, number, period, space).
+- Confirmed via direct extraction from `Data/DELL/10-Q_2025-12-09.htm`: DELL's real filing text uses two different formats, neither matching. Its Table of Contents reads "Item 1.Financial Statements" (no space after the period); its real section heading reads "ITEM 1 — FINANCIAL STATEMENTS (UNAUDITED)" (all caps, no period at all, an em-dash instead).
+- Result: `raw_matches` comes back empty for nearly every DELL filing. Confirmed via a real dry run against `Data/DELL/`: 16 of 16 filing documents (every 10-Q and 10-K) fell back to one whole-document parent, zero Item-level splitting.
+- **Impact so far: none observed.** DELL's Q1 eval answers have come from transcript content, not filing content, in every run this session -- this is a real, confirmed gap, not a hypothetical one, but it hasn't cost anything on this eval set yet. It would matter for any future question that needs DELL's MD&A or a specific filing Item.
+- **Fix, not yet built:** loosen `ITEM_PATTERN` (or add a second pattern) to also match DELL's no-space and em-dash heading forms, then re-validate against DELL's real filings the same way ALAB's format was originally validated.
+
+### Item: NBIS's 20-F gets zero Item-level splitting (known scope gap, now confirmed real)
+
+- `ITEM_TITLE_KEYWORDS` only defines titles for the 10-K/10-Q Item numbering scheme. NBIS files a 20-F (foreign private issuer annual report), which uses an entirely different Item 1-19 scheme with unrelated titles -- already called out as an explicit, intentional gap in the module's own code comments before today.
+- Confirmed via today's dry run: NBIS's 20-F falls back to one whole-document parent (571,786 chars, zero splitting).
+- **Fix, not yet built:** would need its own `ITEM_TITLE_KEYWORDS`-equivalent map for the 20-F's real item scheme, or a separate 20-F-specific splitter.
+
+### Item: every ticker's 8-K gets zero Item-level splitting (known scope gap, universal)
+
+- 8-Ks use decimal sub-item numbers (Item 1.01, Item 2.02, Item 5.02, Item 9.01), which `\d{1,2}[A-Z]?` was never built to match.
+- Confirmed via today's dry run: every one of the 6 tracked tickers' 8-Ks falls back to a whole-document parent.
+- **Impact: likely low.** Each ticker's 8-K in `Data/` is a short, one-off event disclosure (3-5K chars), not the kind of source a driver/guidance question needs. Not prioritized.
+
 ## Appendix: Data Requirements & Supplementary Detail
 
 *Supporting detail: minimum onboarding data set, competitive landscape, and post-MVP data roadmap. Appendix B (competitive landscape) is worth reading directly.*
