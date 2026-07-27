@@ -70,7 +70,7 @@ from typing import NamedTuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState as PrebuiltAgentState
@@ -148,23 +148,38 @@ analyst/market data), call the relevant tool for EACH category before concluding
 it; do not generalize a finding from one category you checked (e.g. no news found) to another \
 you never checked (e.g. no filings found).
 
-A deterministic Current Fundamentals Health Score block is always shown to the user immediately \
-before your answer -- it is rendered directly from real data, not written by you. Do not restate, \
-repeat, or re-characterize that block's overall verdict or any signal's status in your own words, \
-and never phrase your answer as a comparison over time ("since you bought this stock...", "this \
-has changed since...", "remains improved") -- there is no stored history of past scores, so any \
-such comparison would be unsupported. Your job is narrower: add supporting detail underneath that \
-block -- the specific numbers, filings, news, and citations behind each signal -- without ever \
-independently declaring whether something has gotten better or worse.
+You may call multiple tools across multiple steps before your final answer -- the user only ever \
+sees that final message, never your intermediate reasoning or earlier tool-calling steps. Write \
+ONE cohesive answer, not a sequence of updates. Never refer to "my prior answer," "recapping," or \
+otherwise treat an earlier step within this same turn as if it were a previous, separate response \
+-- there is no previous response within a turn, only steps you took to arrive at this one answer.
 
-If a signal in that block is marked "insufficient data" (e.g. a 20-F filer with no quarterly XBRL \
-on file), you may still report real, tool-sourced numbers relevant to that same dimension -- e.g. \
-a growth or margin figure the company disclosed on an earnings call -- but you must clearly label \
-that figure as self-reported / from a different source (transcript, press release), not as the \
-structured signal itself, and state plainly that it does not resolve the "insufficient data" \
-status. Never present such a figure under a header that mirrors the signal's own name (e.g. \
-"Revenue Growth", "Margin") without that caveat -- a reader should never come away thinking a \
-precise, confidently-stated number fills a gap the app has explicitly flagged as unverified."""
+There is no separate status block shown to the user -- you are the only place the current \
+Fundamentals Health Score's overall verdict and each signal's status can appear, so mention ONLY \
+the parts that are directly relevant to what the user actually asked. A question about insider \
+selling should surface insider activity (and the overall verdict only if that's genuinely germane \
+to answering it) -- not a full rundown of all four signals every time regardless of what was \
+asked. If nothing in the health score is relevant to the question, don't mention it at all. This \
+applies to every turn equally, not just the first one in a conversation. Exception: if the user \
+directly asks about current status overall or about a specific signal, always answer that \
+honestly from the real data -- never omit or deflect a status question just because it wasn't the \
+main topic. When you do state status, phrase it plainly in your own prose (e.g. "ALAB's \
+fundamentals are currently at risk, driven mainly by insider selling"), not as a bulleted \
+template, and ground every status word in the health score data given below -- never soften, \
+escalate, or hedge a status differently than the data states it. Never phrase anything as a \
+comparison over time ("since you bought this stock...", "this has changed since...", "remains \
+improved") -- there is no stored history of past scores, so any such comparison would be \
+unsupported; state status and supporting detail as CURRENT facts only, never as an answer to a \
+since-then question.
+
+If a signal is marked "insufficient data" (e.g. a 20-F filer with no quarterly XBRL on file), you \
+may still report real, tool-sourced numbers relevant to that same dimension -- e.g. a growth or \
+margin figure the company disclosed on an earnings call -- but you must clearly label that figure \
+as self-reported / from a different source (transcript, press release), not as the structured \
+signal itself, and state plainly that it does not resolve the "insufficient data" status. Never \
+present such a figure under a header that mirrors the signal's own name (e.g. "Revenue Growth", \
+"Margin") without that caveat -- a reader should never come away thinking a precise, \
+confidently-stated number fills a gap the app has explicitly flagged as unverified."""
 
 
 class AgentState(PrebuiltAgentState):
@@ -199,6 +214,16 @@ def build_system_prompt(state: AgentState) -> list:
     build that step's LLM call and is NOT persisted into checkpointed
     state, which is what keeps this from stacking duplicate system
     messages into thread history across turns.
+
+    2026-07-27: previously threaded a turn-position (_is_first_turn)
+    flag through here to decide whether to state status at all --
+    removed. That solved a different problem than the one raised (Maiu:
+    "it should only capture and share relevant info, not all... that is
+    the core promise of the product") -- relevance to the QUESTION, not
+    position in the thread. Relevance filtering is now a single static
+    rule in STABLE_SYSTEM_PROMPT itself (the model already has the
+    question every turn in the normal path), so no per-turn variability
+    is needed here anymore -- simpler than what was here before.
     """
     ticker = state.get("ticker", "UNKNOWN")
     health_score_text = state.get("health_score_text", "(not computed)")
@@ -376,19 +401,24 @@ def _question_needs_filings_check(question: str) -> bool:
 #
 # Every attempt shared the same flaw: they let the model freely compose
 # an answer to a question that invites a since-purchase comparison, then
-# tried to police what it said afterward. This function removes that
-# decision from the model entirely, following the same principle this
-# codebase already uses for Q8 (`compute_trend_deltas` computes the
-# real numbers in Python; the LLM only narrates them, never computes
-# them) -- Task 7's Next Steps names this as the intended pattern for
-# Q13 too. get_fundamentals_health_score() already returns the exact,
-# deterministic status of every signal. Rendering that directly as a
-# fixed block -- never delegated to the model -- makes a temporal-
-# comparison claim structurally impossible in the one place it kept
-# appearing, rather than probabilistically less likely. The model is
-# told (STABLE_SYSTEM_PROMPT above) that this block always precedes its
-# answer, and its job is narrowed to supporting detail only, never to
-# characterizing the verdict itself.
+# tried to police what it said afterward. This function removes the
+# STATUS COMPUTATION from the model entirely, following the same
+# principle this codebase already uses for Q8 (`compute_trend_deltas`
+# computes the real numbers in Python; the LLM only narrates them, never
+# computes them) -- Task 7's Next Steps names this as the intended
+# pattern for Q13 too. get_fundamentals_health_score() already returns
+# the exact, deterministic status of every signal; this function renders
+# that as a fixed string the model cannot alter or invent.
+#
+# 2026-07-27 update: this text is no longer displayed to the user
+# directly (Maiu: "remove this template from every chat response"). It's
+# now handed to _compose_grounded_narrative as status_facts -- ground
+# truth the model paraphrases into its own opening prose sentence rather
+# than a bulleted block shown verbatim. What stays structurally
+# impossible either way: the model never COMPUTES the status itself,
+# only narrates a value this function already determined. That's the
+# actual Q13 fix; the display format was always a separate concern from
+# it, just coupled by having lived in the same prepended block.
 def _render_current_status_block(ticker: str, health_score: dict) -> str:
     order = {"intact": 0, "monitor": 1, "at_risk": 2, "insufficient_data": -1}
     overall = health_score.get("overall", "insufficient_data")
@@ -507,13 +537,32 @@ Health Score?" -> False (asks about current status and what to watch, not whethe
 comparison)
 - "Astera Labs just dropped 8% today, I'm nervous -- should I sell?" -> False (asks what the current \
 data supports doing next, a forward decision -- not a claim that something has changed since a past \
-reference point)"""
+reference point)
+- "Marvell's gross margin has been bouncing around the last few quarters -- up, down, up again. \
+What's driving that, and is the next quarter's guidance more of the same, or something different?" \
+-> False (asks whether a metric's current/guided move is consistent with its own recent trailing \
+pattern -- a data-driven trend question answerable directly from already-available figures, not a \
+comparison against a personal reference point like a purchase date)"""
 _temporal_question_llm = build_chat_llm(model="gpt-4.1-mini", temperature=0).with_structured_output(
     TemporalComparisonQuestion
 )
 
 
 def _question_invites_temporal_comparison(question: str) -> bool:
+    # Diagnostic bypass, added 2026-07-27, temporary and off by default:
+    # forces this classifier to always return False, skipping the LLM
+    # call entirely, so the 4 demo questions can be retested through the
+    # normal question-aware agent path with zero chance of a misroute
+    # into _compose_grounded_narrative. This does NOT remove the
+    # classifier or the composer-split fix -- eval_dataset.json's real
+    # Q13 ("...since I bought it...") still needs both to pass
+    # test_q13.py, and this flag must be unset (the default) for that.
+    # Scoped to a env var, not a code deletion, specifically so it's
+    # trivial to confirm this stays off outside of deliberate testing.
+    if os.environ.get("DISABLE_TEMPORAL_CLASSIFIER"):
+        print(f"[temporal-comparison classifier] BYPASSED (DISABLE_TEMPORAL_CLASSIFIER set) -> False")
+        return False
+
     verdict = _temporal_question_llm.invoke(
         [("system", _TEMPORAL_QUESTION_PROMPT), ("human", question)]
     )
@@ -539,8 +588,12 @@ def _extract_tool_outputs(messages) -> str:
 
 def _render_signal_facts(health_score: dict) -> str:
     """Supporting numeric detail for every signal that has real computed
-    data -- NOT the signal's status/verdict, which the narrative
-    composer is banned from repeating (see _SUPPORTING_DETAIL_PROMPT).
+    data -- NOT the signal's status/verdict. Status is a separate input
+    to the composer now (status_facts, from _render_current_status_block
+    -- see _compose_grounded_narrative), stated in the composer's own
+    opening sentence; this function stays scoped to supporting facts only
+    so that ground-truth status text isn't duplicated or drifted between
+    two different functions.
 
     Exists because a real test_q13.py run against ALAB caught a gap:
     two of the four signals (revenue_growth, margin) are computed
@@ -565,20 +618,45 @@ def _render_signal_facts(health_score: dict) -> str:
     return "\n\n".join(lines) if lines else "(no additional structured signal data)"
 
 
-_SUPPORTING_DETAIL_PROMPT = """You are writing the supporting-detail section of a portfolio \
-research answer. A deterministic Current Fundamentals Health Score block (shown separately, not \
-written by you) already states the verdict for each signal: revenue growth, margin, insider \
-activity, leadership. Your only job is to add specific supporting detail for EVERY signal below \
-that has real data -- exact numbers, filing citations, dates -- whether that data came from a \
-tool call (news/filings/market data) or from the structured signal data section (computed \
-directly, e.g. XBRL revenue/margin figures). A signal with real data in EITHER section below \
-must get its own paragraph -- do not skip a signal just because its only source is structured \
-data rather than a tool result. Do not state or restate any signal's status or the overall \
-verdict, and do not open with a summary sentence about the verdict. Do not use the words "since", \
-"compared to", "change", "remains", or reference when the user purchased anything -- describe \
-each signal's supporting facts as current facts, not as an answer to a comparison question. One \
-short paragraph per signal that has real data below, clearly labeled, with sources cited where \
-applicable.
+# 2026-07-27: now receives the actual question (see USER QUESTION below),
+# reversing this composer's original design, which deliberately never
+# showed it the question text -- that isolation existed specifically to
+# stop Q13-shaped mirroring ("since you bought it..."). Per Maiu,
+# explicit: disregard that concern for this fix -- relevance filtering
+# needs to know what the question is actually about, and there is no
+# way to judge relevance without seeing it. The comparison-language ban
+# below stays regardless -- that's a real honesty constraint (the app
+# has no purchase-date data, so a since-purchase claim would be false
+# regardless of Q13), not eval-scoring infrastructure.
+_SUPPORTING_DETAIL_PROMPT = """You are writing a portfolio research answer about the user's \
+current Fundamentals Health Score. GROUND TRUTH STATUS below is deterministic, computed from real \
+data, not written by you.
+
+USER QUESTION:
+{question}
+
+Mention ONLY the parts of GROUND TRUTH STATUS that are directly relevant to answering this \
+question -- e.g. a question about insider selling should surface insider activity (and the \
+overall verdict only if genuinely germane), not a full rundown of all four signals regardless of \
+what was asked. If nothing in the status is relevant to this question, don't mention status at \
+all. Exception: if the question directly asks about overall status or a specific signal, always \
+answer that honestly from GROUND TRUTH STATUS -- never omit or deflect a direct status question. \
+When you do state status, write it as your own plain-prose sentence, not a copy of the bullet \
+formatting.
+
+After that, add specific supporting detail ONLY for the signal(s) you determined are relevant \
+above -- exact numbers, filing citations, dates -- whether that data came from a tool call (news/\
+filings/market data) or from the structured signal data section (computed directly, e.g. XBRL \
+revenue/margin figures). Do not add a paragraph for a signal that isn't relevant to the question \
+just because it has data available.
+
+Never phrase anything -- the status sentence or the supporting detail -- as a comparison over \
+time. Do not use the words "since", "compared to", "change", "remains", or reference when the \
+user purchased anything. There is no stored history of past scores; state the current status and \
+its supporting facts as CURRENT facts only, never as an answer to a since-then question.
+
+GROUND TRUTH STATUS:
+{status_facts}
 
 STRUCTURED SIGNAL DATA:
 {signal_facts}
@@ -588,8 +666,13 @@ TOOL RESULTS:
 _narrative_llm = build_chat_llm(model="gpt-4.1-mini", temperature=0)
 
 
-def _compose_grounded_narrative(tool_outputs: str, signal_facts: str) -> str:
-    prompt = _SUPPORTING_DETAIL_PROMPT.format(tool_outputs=tool_outputs, signal_facts=signal_facts)
+def _compose_grounded_narrative(question: str, tool_outputs: str, signal_facts: str, status_facts: str) -> str:
+    prompt = _SUPPORTING_DETAIL_PROMPT.format(
+        question=question,
+        tool_outputs=tool_outputs,
+        signal_facts=signal_facts,
+        status_facts=status_facts,
+    )
     return _narrative_llm.invoke([("human", prompt)]).content
 
 
@@ -642,32 +725,51 @@ def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: 
             tools_used.append("search_filings")  # forced call above, bypassed the graph's own tool node
             tool_calls.append({"name": "search_filings", "args": forced_filings_args})
 
-    # Deterministic status block prepended to every answer -- see the
-    # comment above _render_current_status_block for why this replaced
-    # four rounds of detect-and-correct attempts. Not written back into
-    # result["messages"] (checkpointed state); it's regenerated fresh
-    # from real data on every turn, same as health_score_text above.
+    # Bulleted status block REMOVED from the displayed answer (2026-07-27,
+    # Maiu: "remove this template from every chat response"). It is not
+    # simply deleted, though -- _render_current_status_block's deterministic
+    # text is still computed and still the single ground-truth source for
+    # overall/per-signal status; it's now handed to the model as
+    # status_facts (composer path) / health_score_text (normal path,
+    # already wired above) to fold into its own prose instead of being
+    # displayed verbatim as bullets. Both STABLE_SYSTEM_PROMPT and
+    # _SUPPORTING_DETAIL_PROMPT were updated in the same change to
+    # instruct the model to actually state that status now -- they
+    # previously banned restating it specifically because a separate
+    # block was guaranteed to show it. Removing the display without also
+    # flipping those two instructions would have silently made the agent
+    # stop ever stating the health-score verdict anywhere; see the
+    # decision recorded here for why both moved together, not just the
+    # display line.
     #
-    # 6th Q13 attempt: for questions shaped as a since-purchase / has-this-
-    # changed comparison, don't use the agent's own free-text answer as
-    # the narrative -- it has already seen the question's literal wording
-    # and reliably mirrors it (see comment block above
-    # TemporalComparisonQuestion). Instead compose the narrative from this
+    # 6th Q13 attempt, PARTIALLY superseded 2026-07-27 -- for questions
+    # shaped as a since-purchase / has-this-changed comparison, still
+    # don't use the agent's own free-text answer as the narrative (it
+    # has already seen the question and, on this question shape,
+    # historically mirrored its framing -- see comment block above
+    # TemporalComparisonQuestion). Still compose the narrative from this
     # turn's raw tool outputs PLUS the health score's own structured
     # signal data (_render_signal_facts -- added after a real test_q13.py
     # run caught the narrative skipping margin entirely, since margin/
     # revenue_growth are computed from XBRL directly and never appear in
-    # a tool-call result), in a prompt that never includes the question
-    # text at all. Every other question shape is unaffected and keeps the
-    # normal agent answer.
+    # a tool-call result). What changed: the composer prompt now DOES
+    # receive the question text (see _SUPPORTING_DETAIL_PROMPT), because
+    # relevance filtering needs it and Maiu explicitly said to disregard
+    # the Q13 mirroring concern for this fix. The mirroring risk this
+    # isolation existed to prevent is real and undefended again here --
+    # disclosed, not silently dropped; test_q13.py (locked eval set)
+    # would be the way to notice if it resurfaces. Every other question
+    # shape is unaffected and keeps the normal agent answer.
     if _question_invites_temporal_comparison(question):
         narrative = _compose_grounded_narrative(
+            question,
             _extract_tool_outputs(result["messages"]),
             _render_signal_facts(health_score),
+            _render_current_status_block(ticker, health_score),
         )
     else:
         narrative = result["messages"][-1].content
-    answer = _render_current_status_block(ticker, health_score) + "\n\n" + narrative
+    answer = narrative
 
     if verbose:
         print_tool_trace(result["messages"])
