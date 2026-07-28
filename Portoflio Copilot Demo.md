@@ -1,5 +1,87 @@
 # Portfolio Copilot — Demo Hardening Plan
 
+## The 4 Live Demo Questions (locked)
+
+Ticker: ALAB, unless noted. Source of truth: `check_demo_question_stability.py`'s `DEMO_QUESTIONS`
+dict — keep this block in sync with that file if either changes, there's no single shared source
+today. Confirmed live and passing end to end (UI + real backend) as of 2026-07-27, including
+`frontend/e2e/chat.spec.ts` and 3x repeated-run stability checks per question.
+
+1. **ALAB dropped 12% this week. I'm getting nervous—should I sell?**
+2. **Does ALAB rely heavily on any single customer for revenue -- is any one customer a majority?**
+3. **Revenue growth has slowed for several quarters straight -- does the latest quarter suggest
+   that's stabilizing, or is a bigger slowdown coming?**
+4. **Is there anything in ALAB's latest earnings I should be worried about moving forward,
+   especially around margin or guidance?**
+
+---
+
+## Open Next Steps
+
+### Semantic / episodic memory
+
+Not built. `MemorySaver()` (`app/graph.py:240`) is short-term, in-memory, thread-scoped only, wiped
+on restart. `user_memory` (schema in `app/db.py`) exists but nothing reads or writes it. Two
+separable pieces of work, different sizes:
+
+**Persistent conversation memory (small, mechanical).** Swap `MemorySaver()` for LangGraph's
+`PostgresSaver` (`langgraph-checkpoint-postgres` package), pointed at the existing `DATABASE_URL`.
+Creates its own checkpoint tables, separate from `app/db.py`'s schema. `/chat` is a plain sync `def`
+in `server.py`, and the graph is built once at import time, so this is the straightforward sync
+variant, not async. Verify after: a conversation survives a restart, and the AnswerGuard's second
+`graph.invoke()` on the same thread still behaves correctly with a real DB round trip instead of an
+in-memory dict lookup (adds latency per turn, worth measuring). Roughly half a day of real work
+including testing.
+
+**Semantic + episodic memory (bigger, real product decisions, not just infra).**
+
+Semantic memory examples for North, stable facts, not tied to one conversation:
+- Investment thesis per holding: "bought ALAB for the AI datacenter interconnect thesis, holding
+  long term." Changes what a health-score flag should mean to this specific user, a margin dip
+  matters more to a short-term trader than someone who stated a 3-year thesis.
+- Stated risk tolerance and answer-style preferences: "don't hedge, give me a direct answer" or
+  "always show me the bear case first." The most immediately useful one, and cheap to build since
+  it's a small, bounded set of facts per user, not something that grows over time.
+- Known context not captured elsewhere: "this is a core position, not a trade" or "I already know
+  about the customer concentration risk, don't re-explain it every time."
+
+Episodic memory examples for North, records of specific past exchanges:
+- "Last week I told you ALAB's top end customer is over 70% of revenue" so the agent doesn't
+  re-fetch and re-state the same fact identically, and can reference it ("as I mentioned").
+- Already-surfaced news, literally what the `news_dedup` table's schema was built for: don't
+  present the same headline as "notable" twice within a 24 to 48 hour window.
+- A log of past flags: "on 2026-07-20 I flagged an insider-selling cluster for ALAB," useful for
+  detecting an actual pattern over time rather than treating every insider sale as isolated.
+
+A third kind, named directly since `app/graph.py`'s own comment names all three: procedural
+memory, about response format rather than facts. Example: "when I ask about margin, always show
+QoQ and YoY together," learned from how the user actually reacted to past answers.
+
+What actually needs deciding before any code gets written: what counts as worth remembering and
+how it gets captured (explicit "remember that" command vs. an LLM inferring it, which is a new LLM
+call, new cost, new failure surface of extracting the wrong thing or missing something); what gets
+loaded back in on a new turn (semantic facts are cheap, a small bounded set; episodic memory needs
+real relevance retrieval, recent N events or real semantic search over past episodes, or context
+grows unbounded). LangGraph has a purpose-built abstraction for this, the Store API
+(`BaseStore`/`PostgresStore`), separate from the checkpointer, meant for cross-thread long-term
+memory — using that instead of hand-rolling reads/writes against the flat `user_memory(key, value,
+memory_type, updated_at)` schema is likely the more durable choice, worth deciding explicitly.
+Single-user, no-auth scope removes the per-user partitioning problem, usually half the real
+complexity here. Even so: realistically multiple days of real design, build, and test time, mostly
+because the hard part is deciding what should be remembered and how transparently it's used, not
+the database wiring.
+
+**News dedup specifically (the easy piece of episodic memory).** No LLM, no "what's worth
+remembering" judgment call, just a deterministic hash-and-check: hash each news item's URL, check
+`news_dedup` for `(ticker, url_hash)` within the 24-48h window before treating it as new, insert if
+not seen. Touches two separate live Tavily call sites, not one: `app/tools.py`'s `get_dashboard_data`
+(runs on every dashboard load) and the chat agent's `search_live_news` tool (runs only when the
+agent chooses it) — worth deciding scope precisely (does chat's proactive tool call need dedup at
+all, since it's user-initiated per question, not surfaced unprompted) rather than blanket-applying
+to both. A few hours of real work, not days — the easiest item on this list.
+
+---
+
 **Status: planning only. Nothing below is built. Per CLAUDE.md, no work starts on any item until
 Maiu reviews and explicitly approves it, item by item.**
 

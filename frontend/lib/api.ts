@@ -31,10 +31,17 @@ export interface HealthScore {
   signals: {
     revenue_growth?: HealthSignal & {
       yoy_growth_by_quarter?: QuarterPoint[];
-      // Separate, wider (~2yr) QoQ series for the chart -- independent of
-      // whatever window the status calc actually reads (backend,
-      // 2026-07-27). See fetch_xbrl_financials.py's classify_revenue_trend.
+      // Separate, wider (~2yr) QoQ series -- independent of whatever
+      // window the status calc actually reads (backend, 2026-07-27). No
+      // longer read by the chart (see yoy_growth_chart below) but kept on
+      // the wire since the status pill itself is still QoQ-streak-based
+      // and this remains useful debugging context.
       qoq_growth_chart?: QuarterPoint[];
+      // Wider (~2yr) YoY series -- what the Revenue Growth chart actually
+      // renders as of 2026-07-28 (Maiu: reverted from QoQ to YoY). Status
+      // pill above is UNCHANGED and still QoQ-streak-based -- see
+      // fetch_xbrl_financials.py's classify_revenue_trend docstring.
+      yoy_growth_chart?: QuarterPoint[];
     };
     margin?: HealthSignal & { margin_by_quarter?: QuarterPoint[] };
     leadership?: HealthSignal & {

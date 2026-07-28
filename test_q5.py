@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from datetime import datetime, timedelta
 
 import requests
@@ -46,7 +47,32 @@ CODE_LABELS = {
 }
 
 
+# Caching added 2026-07-27 (Maiu, explicit call, same pattern as
+# app/tools.py's quote/news/earnings-date caches): this is called from
+# get_market_data on essentially every chat question, uncached, one of
+# four real contributors found in a caching audit to hitting Finnhub's
+# rate limit. 24h TTL -- Maiu's explicit call, accepting that a fresh
+# Form 4 filed today could sit unsurfaced for up to a day in exchange
+# for the call-volume reduction; flagged once as a real signal-latency
+# tradeoff for this specific one before applying it, not a silent
+# default.
+INSIDER_TTL_SECONDS = 86400  # 24 hours
+_INSIDER_CACHE: dict[str, tuple[float, list[dict]]] = {}
+
+
 def fetch_insider_transactions(symbol: str, api_key: str) -> list[dict]:
+    symbol = symbol.upper()
+    now = time.monotonic()
+    cached = _INSIDER_CACHE.get(symbol)
+    if cached and now - cached[0] < INSIDER_TTL_SECONDS:
+        return cached[1]
+
+    result = _fetch_insider_transactions_uncached(symbol, api_key)
+    _INSIDER_CACHE[symbol] = (now, result)
+    return result
+
+
+def _fetch_insider_transactions_uncached(symbol: str, api_key: str) -> list[dict]:
     url = "https://finnhub.io/api/v1/stock/insider-transactions"
     resp = requests.get(url, params={"symbol": symbol, "token": api_key})
     resp.raise_for_status()

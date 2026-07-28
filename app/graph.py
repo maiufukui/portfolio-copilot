@@ -73,6 +73,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState as PrebuiltAgentState
 from pydantic import BaseModel, Field
@@ -235,9 +236,61 @@ def build_system_prompt(state: AgentState) -> list:
     return [SystemMessage(content=STABLE_SYSTEM_PROMPT + per_turn_context)] + state["messages"]
 
 
+# PostgresSaver.from_conn_string() is a generator-based context manager, not
+# a plain constructor -- module-level so the entered connection stays open
+# for the server process's lifetime (build_graph() is called once at import
+# time, server.py:80) instead of getting garbage-collected/closed the
+# instant build_graph() returns.
+_checkpointer_cm = None
+
+
+def _normalize_psycopg_conn_string(raw_url: str) -> str:
+    """Rewrites Heroku-style 'postgres://' to 'postgresql://' only --
+    deliberately NOT app/db.py's _normalize_database_url, which appends
+    '+psycopg' (a SQLAlchemy dialect+driver suffix, e.g.
+    'postgresql+psycopg://'). PostgresSaver.from_conn_string() hands the
+    string straight to raw psycopg, which doesn't understand SQLAlchemy's
+    '+driver' suffix syntax at all -- a real, easy-to-get-wrong difference
+    between the two normalizers, not an oversight that they're separate.
+
+    Real gap, found 2026-07-27: the first version of this shipped with no
+    connect_timeout at all. psycopg/libpq's default is to wait on the OS's
+    own TCP timeout (can be minutes, not seconds) if the host is slow or
+    unreachable -- and because this connection is opened once at server
+    IMPORT time (build_graph(), called from server.py's module scope),
+    a slow/hung connection here doesn't just fail one request, it hangs
+    the entire server's startup, so nothing -- not even unrelated
+    endpoints like /dashboard -- can respond until it resolves one way or
+    the other. 10s is generous for a real DB, and fails loud and fast
+    instead of silently for a bad one."""
+    if raw_url.startswith("postgres://"):
+        raw_url = "postgresql://" + raw_url[len("postgres://"):]
+    if "connect_timeout=" not in raw_url:
+        separator = "&" if "?" in raw_url else "?"
+        raw_url = f"{raw_url}{separator}connect_timeout=10"
+    return raw_url
+
+
 def build_graph():
     llm = build_chat_llm(model="gpt-4.1-mini", temperature=0)
-    checkpointer = MemorySaver()  # thread-scoped short-term memory (Session 3)
+
+    # Persistent, Postgres-backed thread-scoped memory (2026-07-27) --
+    # replaces MemorySaver(), which was wiped on every restart. Falls back
+    # to MemorySaver() when DATABASE_URL isn't set (e.g. local dev without
+    # a DB configured) so this doesn't hard-fail environments that never
+    # needed persistence in the first place.
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        global _checkpointer_cm
+        conn_string = _normalize_psycopg_conn_string(database_url)
+        _checkpointer_cm = PostgresSaver.from_conn_string(conn_string)
+        checkpointer = _checkpointer_cm.__enter__()
+        checkpointer.setup()  # idempotent -- tracks its own migration
+        # version table, safe to call on every boot (verified against the
+        # installed langgraph-checkpoint-postgres==2.0.25 source directly).
+    else:
+        checkpointer = MemorySaver()  # thread-scoped short-term memory (Session 3), non-persistent fallback
+
     return create_react_agent(
         llm,
         tools=TOOL_BELT,

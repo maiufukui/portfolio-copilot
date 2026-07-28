@@ -67,23 +67,42 @@ def fetch_concept(cik: str, tag: str) -> list[dict] | None:
 
 
 def fetch_revenue(cik: str) -> tuple[str, list[dict]]:
-    # Real bug, found against PANW (2026-07-25): this used to return the
+    # Real bug #1, found against PANW (2026-07-25): this used to return the
     # first tag with ANY entries, not the first tag with USABLE quarterly
     # entries. Companies tag revenue inconsistently -- PANW's "Revenues"
     # tag had data, but none of it was quarter-shaped (likely annual/legacy
     # entries only), so quarterly_series() downstream silently produced 0
     # quarters and the loop never tried the next candidate tag, even though
     # RevenueFromContractWithCustomerExcludingAssessedTax exists in
-    # REVENUE_TAGS specifically for this situation. Now checks that
+    # REVENUE_TAGS specifically for this situation. Fixed by checking that
     # quarterly_series(entries) actually yields something before committing
-    # to a tag. Backward-compatible: for tickers where the first tag already
-    # had usable quarterly data (confirmed: ALAB, DELL), this changes
-    # nothing.
+    # to a tag.
+    #
+    # Real bug #2, found against AAPL (2026-07-27): fix #1 wasn't enough --
+    # it checked for USABLE quarterly data but not RECENT quarterly data.
+    # Apple reported revenue under the generic "Revenues" tag until it
+    # adopted ASC 606 (~fiscal 2019) and switched to
+    # RevenueFromContractWithCustomerExcludingAssessedTax. "Revenues" still
+    # has a long, perfectly valid-looking quarterly history under the old
+    # standard -- it's just entirely from 2009-2018. That satisfied the
+    # "non-empty" check from fix #1 and got returned immediately, so the
+    # chart/status ended up built from an 8-year-stale series without
+    # erroring or falling through to the tag that's actually current.
+    # Now also requires the most recent quarter's end date to be within
+    # the last ~13 months (12 months + a quarter's slack for a company
+    # reporting a bit late) before accepting a tag.
     for tag in REVENUE_TAGS:
         entries = fetch_concept(cik, tag)
-        if entries and quarterly_series(entries):
-            return tag, entries
-    raise ValueError(f"No revenue concept with usable quarterly data found for CIK {cik} -- tried {REVENUE_TAGS}")
+        if not entries:
+            continue
+        series = quarterly_series(entries)
+        if not series:
+            continue
+        most_recent_end = date.fromisoformat(series[-1]["end"])
+        if (date.today() - most_recent_end).days > 400:
+            continue  # usable shape, but stale -- try the next tag
+        return tag, entries
+    raise ValueError(f"No revenue concept with usable, recent quarterly data found for CIK {cik} -- tried {REVENUE_TAGS}")
 
 
 def derive_missing_q4(quarterly_by_end: dict[str, dict], entries: list[dict]) -> list[dict]:
@@ -206,22 +225,28 @@ def find_year_ago_quarter(series: list[dict], idx: int, tolerance_days: int = 35
 
 
 def classify_revenue_trend(series: list[dict]) -> dict:
-    """Status is decided by sequential QoQ growth direction over the
-    last 3 quarters -- asymmetric on purpose: all 3 up is required for
-    intact (hard to earn), 2-of-3 down is enough for at_risk (easy to
-    trip), everything else is monitor. Replaces the previous
-    YoY-deceleration-streak logic, which could call something "intact"
-    purely because a very high YoY rate was decelerating gently, without
-    ever checking whether revenue was actually still growing quarter to
-    quarter. yoy_growth_by_quarter is still computed and returned
-    unchanged -- the existing frontend chart reads it, and it remains
-    useful independent context -- it just no longer drives status.
+    """Status is decided by YoY growth direction over the last 3 quarters
+    (2026-07-28, Maiu: switched from a QoQ-delta streak to this, so the
+    pill matches the chart it sits next to exactly -- same 3 quarters,
+    same numbers, same direction). "Up"/"down" here means the quarter's
+    own YoY growth rate was positive or negative (yoy_pct's sign) -- NOT a
+    delta between one quarter's YoY rate and the next quarter's, which
+    would be a rate-of-a-rate and a much noisier, harder-to-explain thing.
+    Same asymmetric shape kept from every version of this rule so far:
+    all 3 quarters positive is required for intact (hard to earn), 2-of-3
+    negative is enough for at_risk (easy to trip), everything else is
+    monitor.
 
-    Confirmed against real ALAB data (2026-07-26): QoQ deltas of
-    +20.1%/+17.4%/+14.0% across the last 3 quarters -> intact, matching
-    the prior logic's result for this ticker. Margin's equivalent
-    redesign (classify_margin_trend, below) did NOT match its prior
-    result on real data -- see that function's docstring.
+    Each quarter's YoY figure already requires a real prior-year
+    comparison within 35 days (find_year_ago_quarter) -- this doesn't
+    invent a looser standard for status than the chart uses, it's the
+    exact same yoy_growth list, just the last 3 of it instead of the last
+    8.
+
+    NOT yet re-confirmed against real data under this version -- the
+    2026-07-26 ALAB confirmation noted below was for the QoQ-streak
+    version this replaces. Re-verify against live ALAB/AAPL data once
+    this can actually be run against real filings again.
     """
     if len(series) < 5:
         return {"status": "insufficient_data", "quarters_available": len(series)}
@@ -242,35 +267,40 @@ def classify_revenue_trend(series: list[dict]) -> dict:
 
     recent = yoy_growth[-4:]
 
-    # Same adjacency guard used throughout this file -- a gap between
-    # quarters (missing filing, restatement) must not get silently
-    # treated as "the next quarter" when computing a QoQ delta.
-    def _is_adjacent_quarter(a: dict, b: dict) -> bool:
-        return 75 <= (date.fromisoformat(b["end"]) - date.fromisoformat(a["end"])).days <= 100
+    # Chart data for the frontend (2026-07-28, Maiu: revenue chart shows
+    # YoY growth for the given quarter, not QoQ -- YoY is what a company's
+    # own reported growth rate means in normal usage, and it isn't
+    # distorted by calendar seasonality the way QoQ is (e.g. Apple's
+    # holiday-quarter-to-next-quarter drop is a real, healthy, recurring
+    # pattern, not deterioration -- a pure QoQ chart made that look
+    # alarming). Capped at the last 8 quarters (~2 years) for display.
+    yoy_growth_chart = yoy_growth[-8:]
 
-    if len(series) < 4:
-        return {"status": "insufficient_data", "quarters_available": len(series),
-                "note": "Need >= 4 quarters to compute 3 QoQ deltas.",
-                "yoy_growth_by_quarter": recent}
+    # Shared adjacency guard -- takes two ISO date strings directly so it
+    # works for both the YoY list (keyed "period") and the raw series
+    # (keyed "end") below, instead of two near-duplicate versions. A gap
+    # between quarters (missing filing, restatement) must not get
+    # silently treated as "the next quarter" when computing any streak.
+    def _adjacent(date_a: str, date_b: str) -> bool:
+        return 75 <= (date.fromisoformat(date_b) - date.fromisoformat(date_a)).days <= 100
 
-    last4 = series[-4:]
-    qoq_growth = []
-    for i in range(1, len(last4)):
-        if not _is_adjacent_quarter(last4[i - 1], last4[i]):
-            qoq_growth = []  # a gap breaks the streak -- don't compute across it
-            break
-        qoq_growth.append({
-            "period": last4[i]["end"],
-            "qoq_pct": round((last4[i]["val"] - last4[i - 1]["val"]) / last4[i - 1]["val"] * 100, 1),
-        })
+    last3_yoy = yoy_growth[-3:]
+    yoy_gap_free = all(
+        _adjacent(last3_yoy[i - 1]["period"], last3_yoy[i]["period"])
+        for i in range(1, len(last3_yoy))
+    )
 
-    if len(qoq_growth) < 3:
-        return {"status": "insufficient_data", "qoq_quarters_available": len(qoq_growth),
-                "note": "Need 3 consecutive, gap-free quarters to compute the QoQ streak.",
-                "yoy_growth_by_quarter": recent}
+    if len(last3_yoy) < 3 or not yoy_gap_free:
+        return {
+            "status": "insufficient_data",
+            "yoy_quarters_available": len(last3_yoy),
+            "note": "Need 3 consecutive, gap-free quarters with a real YoY comp to compute the streak.",
+            "yoy_growth_by_quarter": recent,
+            "yoy_growth_chart": yoy_growth_chart,
+        }
 
-    down = sum(1 for q in qoq_growth if q["qoq_pct"] < 0)
-    up_all = all(q["qoq_pct"] > 0 for q in qoq_growth)
+    down = sum(1 for q in last3_yoy if q["yoy_pct"] < 0)
+    up_all = all(q["yoy_pct"] > 0 for q in last3_yoy)
 
     if down >= 2:
         status = "at_risk"
@@ -279,19 +309,27 @@ def classify_revenue_trend(series: list[dict]) -> dict:
     else:
         status = "monitor"
 
-    # Chart data for the frontend (2026-07-27, Maiu: revenue chart should
-    # show QoQ growth, not YoY, and cover ~2 years) -- a SEPARATE
-    # computation from qoq_growth above, on purpose: qoq_growth is
-    # deliberately frozen at the last 3 deltas because that's the exact
-    # window the intact/monitor/at_risk status streak is tuned against
-    # (see this function's own docstring). Widening qoq_growth itself to
-    # show more history would silently widen the status window too. This
-    # walks the full series instead, capped at the last 8 quarters (~2
-    # years) of QoQ deltas, purely for display -- status above never reads
-    # this variable.
+    # QoQ figures below no longer drive status (see docstring) -- still
+    # computed and returned since other consumers (chat tool answers,
+    # eval harness) may reference qoq_growth_by_quarter/qoq_growth_chart,
+    # and removing a field without checking every reader first is exactly
+    # the kind of silent breakage this project's working agreements rule
+    # out.
+    qoq_growth: list[dict] = []
+    if len(series) >= 4:
+        last4 = series[-4:]
+        for i in range(1, len(last4)):
+            if not _adjacent(last4[i - 1]["end"], last4[i]["end"]):
+                qoq_growth = []  # a gap breaks the streak -- don't compute across it
+                break
+            qoq_growth.append({
+                "period": last4[i]["end"],
+                "qoq_pct": round((last4[i]["val"] - last4[i - 1]["val"]) / last4[i - 1]["val"] * 100, 1),
+            })
+
     qoq_growth_chart = []
     for i in range(1, len(series)):
-        if not _is_adjacent_quarter(series[i - 1], series[i]):
+        if not _adjacent(series[i - 1]["end"], series[i]["end"]):
             continue  # skip just this one broken pair -- a display list, not a decision streak
         qoq_growth_chart.append({
             "period": series[i]["end"],
@@ -304,6 +342,7 @@ def classify_revenue_trend(series: list[dict]) -> dict:
         "yoy_growth_by_quarter": recent,
         "qoq_growth_by_quarter": qoq_growth,
         "qoq_growth_chart": qoq_growth_chart,
+        "yoy_growth_chart": yoy_growth_chart,
     }
 
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -33,10 +34,33 @@ load_dotenv()
 FINNHUB_RECOMMENDATION_URL = "https://finnhub.io/api/v1/stock/recommendation"
 
 
+# Caching added 2026-07-27 (Maiu, explicit call) -- same audit/pattern as
+# test_q5.py's fetch_insider_transactions. 24h TTL is a lower-risk call
+# than insider transactions specifically: Finnhub's own recommendation
+# data is an aggregated monthly-cadence consensus, not something that
+# actually updates intraday, so a day-old cache isn't giving up real
+# freshness the source itself doesn't already lack.
+RECOMMENDATION_TTL_SECONDS = 86400  # 24 hours
+_RECOMMENDATION_CACHE: dict[str, tuple[float, list[dict]]] = {}
+
+
 def fetch_recommendation_trends(ticker: str, api_key: str) -> list[dict]:
     """Real institutional analyst consensus (aggregated buy/hold/sell counts
     from actual sell-side coverage) -- not scraped from the open web. Free
-    tier. Most recent period first."""
+    tier. Most recent period first. Cached per ticker for
+    RECOMMENDATION_TTL_SECONDS -- see comment above."""
+    ticker = ticker.upper()
+    now = time.monotonic()
+    cached = _RECOMMENDATION_CACHE.get(ticker)
+    if cached and now - cached[0] < RECOMMENDATION_TTL_SECONDS:
+        return cached[1]
+
+    result = _fetch_recommendation_trends_uncached(ticker, api_key)
+    _RECOMMENDATION_CACHE[ticker] = (now, result)
+    return result
+
+
+def _fetch_recommendation_trends_uncached(ticker: str, api_key: str) -> list[dict]:
     resp = requests.get(FINNHUB_RECOMMENDATION_URL, params={"symbol": ticker, "token": api_key})
     resp.raise_for_status()
     return resp.json()

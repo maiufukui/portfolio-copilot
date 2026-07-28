@@ -95,6 +95,39 @@ This standard sits above, and does not replace, the tactical working agreements 
   result. Maiu's time waiting on a command is a real cost, not a free variable.
 - **Lead with the direct answer.** If Maiu asks a yes/no or "will I get X" question, the first line
   is the answer. Context, caveats, and reasoning come after, only if needed.
+- **A change "compiling" or working in Claude's own sandbox proves nothing about Maiu's actual
+  local environment.** If a change adds a new dependency, state the install command explicitly, and
+  repeat it on every subsequent handoff that depends on it — never assume one earlier mention
+  survives a long troubleshooting thread. Real incident (2026-07-27): `langgraph-checkpoint-postgres`
+  was added to `requirements.txt` and the install command was given once, then buried under several
+  rounds of unrelated restart/debugging instructions — `uvicorn` crashed with `ModuleNotFoundError`
+  because the package was never actually installed in Maiu's venv, and the gap wasn't caught before
+  handing over the next command.
+- **Never put an inline `#comment` inside a command block meant for direct copy-paste.** Put
+  explanation outside the block, before or after it, never trailing on the same line as a command.
+  A pasted trailing comment becomes literal shell arguments and breaks the command. Real incident
+  (2026-07-27): `npx playwright install chromium   # one-time, ~110MB, free` and
+  `npm run dev   # not required manually...` both failed this exact way, back to back.
+- **Prefer restart/kill commands that degrade gracefully when an assumption doesn't hold**, over
+  ones that error out on an edge case. `pkill -9 -f "uvicorn server:app"` (matches by process
+  command line) over `kill -9 $(lsof -tiTCP:8000 -sTCP:LISTEN)` (matches by listening socket state,
+  and throws a confusing "not enough arguments" error if the port happens to already be free). Real
+  incident (2026-07-27): the `lsof`-based kill command failed exactly this way mid-restart.
+- **`requirements.txt` and `requirements-server.txt` are two hand-maintained files that can silently
+  drift out of sync — check both, every time, when adding or changing a dependency.** A package
+  needed at runtime that only lands in one of the two is a real production gap, not a hypothetical
+  one. Real incident (2026-07-27): `langgraph-checkpoint-postgres` was added to `requirements.txt`
+  for the persistent-memory checkpointer, but not to `requirements-server.txt` — the file
+  `render.yaml`'s `buildCommand` actually installs from — meaning the deployed backend would have
+  been missing it even after a clean push, until Maiu caught the gap by asking an unrelated question
+  about `uv`, not because it was checked. If this repo migrates to a single `pyproject.toml` (open
+  question as of 2026-07-27, see chat), this rule becomes moot and should be removed then — until
+  that migration actually happens, treat the two-file split as live and drift-prone.
+- **After any fix that required real troubleshooting (not a one-shot success), do a final pass
+  before calling it done**: re-read the actual diff, re-check every dependency it introduces is
+  actually installed where it needs to run, and re-verify the exact commands just handed over are
+  copy-paste-safe. The goal is a clean, well-maintained codebase and a smooth handoff, not just a
+  fix that eventually worked after several rounds of back-and-forth.
 
 ## Working agreements for design work
 

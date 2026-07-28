@@ -239,11 +239,40 @@ def search_live_news(query: str, time_range: str = "week") -> str:
     return format_results(results)
 
 
+# Caching added 2026-07-27 (Maiu, explicit call): fetch_quote and
+# fetch_next_earnings_date are called from BOTH get_dashboard_data
+# (every dashboard load, per tracked ticker) and get_market_data (the
+# chat tool, most demo questions), with zero reuse between those call
+# sites -- a real contributor to hitting Finnhub's rate limit, same
+# category of bug as the news-caching fix above. Price gets the
+# shortest TTL (15 min, same as the health score) since a stale price
+# is a real, different kind of wrong an older version of this file's
+# comment specifically called out; the earnings date changes far less
+# often (announced once, weeks out) so a 24h TTL costs nothing real.
+QUOTE_TTL_SECONDS = 900  # 15 minutes
+_QUOTE_CACHE: dict[str, tuple[float, dict | None]] = {}
+EARNINGS_DATE_TTL_SECONDS = 86400  # 24 hours
+_EARNINGS_DATE_CACHE: dict[str, tuple[float, str | None]] = {}
+
+
 def fetch_quote(ticker: str, api_key: str) -> dict | None:
     """Raw Finnhub /quote call, returning the fields the dashboard needs
     (price, % change) as plain data. Extracted out of get_market_data so
     both the chat tool and the dashboard endpoint (server.py) share one
-    implementation instead of two copies of the same request."""
+    implementation instead of two copies of the same request. Cached per
+    ticker for QUOTE_TTL_SECONDS -- see comment above."""
+    ticker = ticker.upper()
+    now = time.monotonic()
+    cached = _QUOTE_CACHE.get(ticker)
+    if cached and now - cached[0] < QUOTE_TTL_SECONDS:
+        return cached[1]
+
+    result = _fetch_quote_uncached(ticker, api_key)
+    _QUOTE_CACHE[ticker] = (now, result)
+    return result
+
+
+def _fetch_quote_uncached(ticker: str, api_key: str) -> dict | None:
     resp = requests.get(FINNHUB_QUOTE_URL, params={"symbol": ticker, "token": api_key}, timeout=15)
     if not resp.ok:
         return None
@@ -261,7 +290,20 @@ def fetch_next_earnings_date(ticker: str, api_key: str) -> str | None:
     """Finnhub's earnings calendar, filtered to this ticker's next
     upcoming report date within a 1-year lookahead window. Returns None
     if nothing is scheduled yet (common -- companies often don't
-    announce next quarter's date until close to it)."""
+    announce next quarter's date until close to it). Cached per ticker
+    for EARNINGS_DATE_TTL_SECONDS -- see comment above."""
+    ticker = ticker.upper()
+    now = time.monotonic()
+    cached = _EARNINGS_DATE_CACHE.get(ticker)
+    if cached and now - cached[0] < EARNINGS_DATE_TTL_SECONDS:
+        return cached[1]
+
+    result = _fetch_next_earnings_date_uncached(ticker, api_key)
+    _EARNINGS_DATE_CACHE[ticker] = (now, result)
+    return result
+
+
+def _fetch_next_earnings_date_uncached(ticker: str, api_key: str) -> str | None:
     today = datetime.now().date()
     resp = requests.get(
         FINNHUB_EARNINGS_CALENDAR_URL,
@@ -470,10 +512,19 @@ TOOL_BELT = [search_filings, search_filings_exact, search_live_news, get_market_
 # in that notebook's own words, "the honesty knob": how stale a
 # result we're willing to serve. XBRL filings and 8-Ks are filed on
 # a quarterly/event cadence, never intraday, so 15 minutes of
-# staleness here is not a real accuracy risk. This deliberately does
-# NOT cover live quotes -- those stay in get_market_data, uncached,
-# because a 15-minute-old price would be a real, different kind of
-# staleness the notebook's own clinic-availability example warns about.
+# staleness here is not a real accuracy risk.
+#
+# 2026-07-27 update: this comment originally said live quotes stay
+# permanently uncached, because a 15-minute-old price is a real,
+# different kind of staleness than a quarterly filing. That reasoning
+# was correct for accuracy, but it didn't account for call volume --
+# fetch_quote turned out to be a real contributor to hitting Finnhub's
+# rate limit (same category of bug as the news-caching fix, see
+# get_dashboard_news above). Maiu's explicit call: quotes now get the
+# same 15-minute TTL as this cache, accepting that specific staleness
+# tradeoff deliberately rather than leaving the call uncached by
+# default. See QUOTE_TTL_SECONDS below fetch_next_earnings_date's
+# original spot in this file.
 # -----------------------------------------------------------------
 HEALTH_SCORE_TTL_SECONDS = 900  # 15 minutes
 _HEALTH_SCORE_CACHE: dict[str, tuple[float, dict]] = {}
@@ -612,75 +663,125 @@ def _compute_fundamentals_health_score(ticker: str) -> dict:
 # this project's own grounded-in-real-data principle, so they're
 # omitted entirely rather than mocked.
 # -----------------------------------------------------------------
+
+# Real bug, found 2026-07-27: this had NO caching at all, unlike
+# get_fundamentals_health_score right above it. Every dashboard load
+# re-hit Tavily fresh for all 6 tracked tickers, and every reload during
+# testing burned 6 more calls -- almost certainly the actual cause of
+# repeatedly hitting Tavily's plan usage limit (HTTP 432), not one
+# unlucky spike. Same cache pattern as the health score, 30 minutes
+# instead of 15 -- news genuinely changes slower than a health score
+# that's partly driven by same-day insider-activity data, so a longer
+# TTL is a real reduction in call volume, not just consistency for its
+# own sake.
+NEWS_TTL_SECONDS = 86400  # 24 hours (2026-07-28, Maiu: was 30 min -- widened
+# to once-a-day since news doesn't move fast enough to justify burning
+# Tavily calls every half hour, and the 30-min version was still going to
+# hit the same usage-limit wall over a full day of testing/demoing.
+_NEWS_CACHE: dict[str, tuple[float, list[dict]]] = {}
+
+
+def get_dashboard_news(ticker: str, force_refresh: bool = False) -> list[dict]:
+    """Recent, relevance-filtered news for one ticker (Supporting Evidence
+    panel). Cached per ticker for NEWS_TTL_SECONDS -- see comment above."""
+    ticker = ticker.upper()
+    now = time.monotonic()
+    if not force_refresh:
+        cached = _NEWS_CACHE.get(ticker)
+        if cached and now - cached[0] < NEWS_TTL_SECONDS:
+            return cached[1]
+
+    news = _fetch_dashboard_news_uncached(ticker)
+    _NEWS_CACHE[ticker] = (now, news)
+    return news
+
+
+def _fetch_dashboard_news_uncached(ticker: str) -> list[dict]:
+    news: list[dict] = []
+    tavily_key = os.environ.get("TAVILY_API_KEY")
+    company = TICKER_TO_COMPANY.get(ticker, ticker)
+    if not tavily_key:
+        return news
+
+    try:
+        # A real, observed failure (not hypothetical): a plain "week"
+        # search for a smaller-cap ticker returned 5 results, none of
+        # them actually about this company -- Tavily backfilled with
+        # loosely-related filler rather than returning fewer, real
+        # hits. Two independent, cheap defenses against showing that
+        # as if it were real news: (1) widen to "month" -- test_q2.py's
+        # own established finding for thin-coverage tickers -- and
+        # (2) require the company name to actually appear in the
+        # title or content, a deterministic sanity check that doesn't
+        # depend on trusting Tavily's own relevance score alone.
+        results = search_tavily(company, tavily_key, time_range="month", max_results=8, topic="news")
+        company_lower = company.lower()
+        # Widened 2026-07-27 (Maiu: ALAB showing zero articles, real
+        # bug) -- the original filter only matched the full company
+        # name ("astera labs") as a literal substring. Financial
+        # headlines routinely use the bare ticker instead
+        # ("ALAB soars on AI demand..."), especially for a name like
+        # Astera Labs that isn't a common dictionary word the way
+        # "Apple" is -- those headlines were being silently dropped
+        # even when genuinely about this company. Ticker match uses a
+        # word-boundary regex, not a plain substring check, so a
+        # 3-5 letter ticker can't accidentally match inside an
+        # unrelated longer word.
+        ticker_pattern = re.compile(rf"\b{re.escape(ticker.lower())}\b")
+
+        def _is_relevant(r: dict) -> bool:
+            title = (r.get("title") or "").lower()
+            content = (r.get("content") or "").lower()
+            return (
+                company_lower in title
+                or company_lower in content
+                or bool(ticker_pattern.search(title))
+                or bool(ticker_pattern.search(content))
+            )
+
+        relevant = [r for r in results if _is_relevant(r)]
+        news = [
+            {
+                "title": r.get("title"),
+                "url": r.get("url"),
+                "date": r.get("published_date"),
+                "excerpt": (r.get("content") or "")[:280],
+            }
+            for r in relevant[:5]
+        ]
+        # Deliberately no synthetic fallback text here if `news` ends up
+        # empty -- an honest "nothing found" is correct output when
+        # nothing relevant clears the bar, not a bug to paper over.
+    except Exception as e:  # noqa: BLE001 -- news is a nice-to-have on this endpoint, never worth a 500
+        # Logged (2026-07-27), not silently swallowed -- an empty `news`
+        # list caused by a real API/network failure was previously
+        # indistinguishable from an empty list caused by "nothing
+        # relevant found," which made a real bug harder to diagnose than
+        # it needed to be.
+        print(f"get_dashboard_news: search failed for {ticker!r}: {e!r}", file=sys.stderr)
+        news = []
+
+    return news
+
+
 def get_dashboard_data(ticker: str) -> dict:
     ticker = ticker.upper()
+    # Real bug, found 2026-07-28 while making an unrelated change: the news
+    # refactor (get_dashboard_news / _fetch_dashboard_news_uncached) moved
+    # this line's only other definition into that new inner function, but
+    # left this function still referencing `company` in its return dict.
+    # That's a NameError on every single call -- this function could not
+    # have returned successfully since that refactor landed. Restoring the
+    # lookup here, independent of whatever _fetch_dashboard_news_uncached
+    # does internally.
+    company = TICKER_TO_COMPANY.get(ticker, ticker)
     health_score = get_fundamentals_health_score(ticker)
 
     api_key = os.environ.get("FINNHUB_API_KEY")
     quote = fetch_quote(ticker, api_key) if api_key else None
     next_earnings_date = fetch_next_earnings_date(ticker, api_key) if api_key else None
 
-    news = []
-    tavily_key = os.environ.get("TAVILY_API_KEY")
-    company = TICKER_TO_COMPANY.get(ticker, ticker)
-    if tavily_key:
-        try:
-            # A real, observed failure (not hypothetical): a plain "week"
-            # search for a smaller-cap ticker returned 5 results, none of
-            # them actually about this company -- Tavily backfilled with
-            # loosely-related filler rather than returning fewer, real
-            # hits. Two independent, cheap defenses against showing that
-            # as if it were real news: (1) widen to "month" -- test_q2.py's
-            # own established finding for thin-coverage tickers -- and
-            # (2) require the company name to actually appear in the
-            # title or content, a deterministic sanity check that doesn't
-            # depend on trusting Tavily's own relevance score alone.
-            results = search_tavily(company, tavily_key, time_range="month", max_results=8, topic="news")
-            company_lower = company.lower()
-            # Widened 2026-07-27 (Maiu: ALAB showing zero articles, real
-            # bug) -- the original filter only matched the full company
-            # name ("astera labs") as a literal substring. Financial
-            # headlines routinely use the bare ticker instead
-            # ("ALAB soars on AI demand..."), especially for a name like
-            # Astera Labs that isn't a common dictionary word the way
-            # "Apple" is -- those headlines were being silently dropped
-            # even when genuinely about this company. Ticker match uses a
-            # word-boundary regex, not a plain substring check, so a
-            # 3-5 letter ticker can't accidentally match inside an
-            # unrelated longer word.
-            ticker_pattern = re.compile(rf"\b{re.escape(ticker.lower())}\b")
-
-            def _is_relevant(r: dict) -> bool:
-                title = (r.get("title") or "").lower()
-                content = (r.get("content") or "").lower()
-                return (
-                    company_lower in title
-                    or company_lower in content
-                    or bool(ticker_pattern.search(title))
-                    or bool(ticker_pattern.search(content))
-                )
-
-            relevant = [r for r in results if _is_relevant(r)]
-            news = [
-                {
-                    "title": r.get("title"),
-                    "url": r.get("url"),
-                    "date": r.get("published_date"),
-                    "excerpt": (r.get("content") or "")[:280],
-                }
-                for r in relevant[:5]
-            ]
-            # Deliberately no synthetic fallback text here if `news` ends up
-            # empty -- an honest "nothing found" is correct output when
-            # nothing relevant clears the bar, not a bug to paper over.
-        except Exception as e:  # noqa: BLE001 -- news is a nice-to-have on this endpoint, never worth a 500
-            # Logged now (2026-07-27), not silently swallowed -- an empty
-            # `news` list caused by a real API/network failure was
-            # previously indistinguishable from an empty list caused by
-            # "nothing relevant found," which made a real bug (this one)
-            # harder to diagnose than it needed to be.
-            print(f"get_dashboard_data: news search failed for {ticker!r}: {e!r}", file=sys.stderr)
-            news = []
+    news = get_dashboard_news(ticker)
 
     return {
         "ticker": ticker,

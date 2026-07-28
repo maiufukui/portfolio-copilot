@@ -23,6 +23,18 @@ function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// "Mar '25" -- plain calendar month + year of the period's end date
+// (2026-07-27, Maiu: switched from a "Q#'YY" quarter label, which is
+// still a real value judgment worth naming -- this is the calendar month
+// the quarter ENDED in, not an attempt to reconstruct each company's own
+// fiscal-quarter numbering, which would need each ticker's fiscal-year-
+// start date (not available here) to label correctly.
+function formatMonthYearLabel(period: string): string {
+  const d = new Date(`${period}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return period;
+  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }).replace(" ", " '");
+}
+
 // Fixed 2026-07-27 (UI audit): the old version only ever read `reason`,
 // which app/tools.py only sets when NO 8-K Item 5.02 was found at all --
 // the moment a real departure filing exists, the backend sends
@@ -332,22 +344,25 @@ export function Dashboard({
             </CardHeader>
             <CardContent className="flex flex-col">
               <SignalRow
-                label="Revenue Growth (QoQ)"
+                label="Revenue Growth (YoY)"
                 status={revenueSignal?.status ?? "insufficient_data"}
                 right={
                   <TrendCell
                     points={
-                      // qoq_growth_chart, not yoy_growth_by_quarter (switched
-                      // 2026-07-27, Maiu) -- the status pill above is itself
-                      // QoQ-based (classify_revenue_trend's streak), so the
-                      // chart now matches what's actually driving the status
-                      // instead of showing a different (YoY) metric next to
-                      // it. ~2 years of quarters, independent of the 3-delta
-                      // window the status calc reads -- see
-                      // fetch_xbrl_financials.py.
-                      revenueSignal?.qoq_growth_chart?.map((q) => ({
-                        label: q.period.slice(2, 7),
-                        value: q.qoq_pct ?? 0,
+                      // yoy_growth_chart, not qoq_growth_chart (reverted
+                      // 2026-07-28, Maiu) -- chart now shows YoY growth for
+                      // each quarter. Note this is now a DELIBERATE mismatch
+                      // with the status pill to its left, which is still
+                      // QoQ-streak-based (classify_revenue_trend) -- flagged
+                      // explicitly rather than silently changed, since this
+                      // is the same kind of chart/status split that was a
+                      // real bug the last time (2026-07-27), just the
+                      // opposite direction and intentional this time. ~2
+                      // years of quarters, independent of the status calc's
+                      // own window -- see fetch_xbrl_financials.py.
+                      revenueSignal?.yoy_growth_chart?.map((q) => ({
+                        label: formatMonthYearLabel(q.period),
+                        value: q.yoy_pct ?? 0,
                       })) ?? []
                     }
                   />
@@ -360,7 +375,7 @@ export function Dashboard({
                   <TrendCell
                     points={
                       marginSignal?.margin_by_quarter?.map((q) => ({
-                        label: q.period.slice(2, 7),
+                        label: formatMonthYearLabel(q.period),
                         value: q.margin_pct ?? 0,
                       })) ?? []
                     }
