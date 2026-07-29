@@ -955,6 +955,85 @@ this round since it wasn't part of what was approved.
 
 ---
 
+## B.11 -- Production deploy failure: two separate real bugs, not one (2026-07-29)
+
+Not an eval-scoring fix -- a real production deploy failure, found via Render's actual build logs
+after pushing commit `1801c03`. Documented here because both root causes are exactly the class of
+gap this doc's own "known, disclosed" sections have been tracking, and because the second one was
+initially under-diagnosed the same way B.10 (PANW) was: the first fix was real and correct, but
+incomplete, and the deploy failed again for a different reason underneath it.
+
+**Bug 1 -- missing pin.** Deploy crashed with `ModuleNotFoundError: No module named
+'langgraph.checkpoint.postgres'` at `app/graph.py:76`'s module-level `from
+langgraph.checkpoint.postgres import PostgresSaver`. `requirements.txt` had
+`langgraph-checkpoint-postgres==2.0.25`; `requirements-server.txt` -- the file `render.yaml`'s
+`buildCommand` actually installs from -- didn't. This is the exact standing risk this repo's own
+CLAUDE.md already flagged from a 2026-07-27 incident (`langgraph-checkpoint-postgres` added to one
+file, not the other). **Fix:** added the matching pin to `requirements-server.txt`. Verified by
+installing `langgraph-checkpoint-postgres==2.0.25` + `psycopg[binary]==3.3.4` together into a fresh
+venv and confirming `from langgraph.checkpoint.postgres import PostgresSaver` imports cleanly --
+not a full `pip install -r requirements-server.txt` end-to-end (this sandbox's 45-second command
+ceiling doesn't fit installing `langchain`/`qdrant-client`/`pymupdf` etc. in one shot), but a real,
+targeted repro of the exact failing import, not just a diff inspection.
+
+**Bug 2 -- found on the very next deploy attempt, after Bug 1's fix was pushed:** `ModuleNotFoundError:
+No module named 'ragas'` at `test_q2.py:29`, reached via `server.py -> app/graph.py -> app/tools.py
+-> test_q2.py`. `app/tools.py` (production, loaded at server startup) was importing
+`format_results`/`search_tavily` directly from `test_q2.py` -- and `test_q2.py` does `from
+ragas.messages import ToolCall` at module level, for its own `run_case()` eval-scoring function.
+`requirements-server.txt` deliberately excludes `ragas` (only needed by the eval harness) -- so any
+production import from `test_q2.py`, regardless of which name was actually needed, executed `import
+ragas` at server startup. The same pattern existed for `test_q5.py` (imported by `app/tools.py` for
+`CODE_LABELS`/`fetch_insider_transactions`/`within_window`) and `test_q8.py` (imported for
+`fetch_recommendation_trends`/`format_recommendation_trends`) -- both also `from ragas.messages
+import ToolCall` at module level. Three separate production-reachable ragas imports, not one.
+
+**Why the fix is a real refactor, not another pin.** Adding `ragas` to `requirements-server.txt`
+would have "worked" but was rejected as a band-aid: it defeats the entire reason
+`requirements-server.txt` exists (keeping eval-only tooling -- and everything `ragas` pulls in --
+out of the deployed image), and it leaves the actual defect in place: production code importing
+from files named `test_q*.py`. `test_q2.py`'s own code comments already independently flagged this
+exact fragility (`ask() is imported HERE, deliberately, not at module level -- app/tools.py imports
+format_results/search_tavily from this file, so a top-level from app.graph import ask here would be
+a real circular import`) -- the architecture was already known-fragile before this incident, just
+not yet known-broken.
+
+**Fix:** new `shared_helpers.py`, holding every function `app/tools.py` actually needs
+(`search_tavily`/`extract_date_from_url`/`display_date`/`format_results` from `test_q2.py`;
+`CODE_LABELS`/`fetch_insider_transactions`/`within_window` from `test_q5.py`;
+`fetch_recommendation_trends`/`format_recommendation_trends` from `test_q8.py`), with zero
+`ragas`/`pytest`/`yfinance` dependency and zero dependency on `app.graph`/`app.tools` (removing the
+circular-import risk too, not just the ragas one). `test_q2.py`/`test_q5.py`/`test_q8.py` now
+import these same functions back from `shared_helpers.py` instead of redefining them, so their own
+CLI behavior and existing external importers (`fetch_transcripts.py`'s `from test_q2 import
+search_tavily`, `run_scorecard.py`'s `from test_q2 import load_q2, run_case`, etc.) are unchanged --
+verified directly via grep, not assumed. `app/tools.py` now imports these six names from
+`shared_helpers.py` directly. `test_q1.py` and `test_q7.py` were checked and left as direct
+imports -- verified (grep, all module-level and inline) that neither imports `ragas`, `pytest`, or
+`yfinance` anywhere, so they carry no risk and didn't need to move.
+
+**Verification:** py_compile on every touched file (`shared_helpers.py`, `test_q2.py`, `test_q5.py`,
+`test_q8.py`, `app/tools.py`, `app/graph.py`, `server.py`, `run_scorecard.py`,
+`fetch_transcripts.py`) -- all clean. A small script walked the real recursive local-import graph
+starting from `server.py` (following every `from`/`import` of a local module, resolving `app.*`
+correctly) and grepped every file actually reachable from production for `ragas`/`pytest`/
+`yfinance` -- every remaining match is inside a comment or docstring, none in an executable import
+statement. `shared_helpers.py` was also actually imported in a fresh venv (not just syntax-checked)
+and confirmed to expose all six required names.
+
+**Not yet done:** a full `pip install -r requirements-server.txt` into a clean venv followed by
+`python -c "import server"`, run as one real end-to-end step -- this sandbox's command-timeout
+ceiling doesn't fit that in one call, and chunking it wasn't attempted this round. The static
+recursive-import-graph check above is real and rigorous, but it's a different kind of verification
+than an actual full install-and-boot, and that gap should be named plainly rather than implied away.
+The correct place for that exact check going forward is CI, run once per push, not something to
+keep re-doing by hand in a sandbox with a 45-second ceiling.
+
+**Result:** fix applied and locally verified as above; not yet committed, pushed, or confirmed via
+an actual Render deploy -- see hand-off section.
+
+---
+
 # Hand-off: final verification run (round 3)
 
 Round 1 (reference fixes) and round 2 (citation/vagueness system-prompt fixes) are both already

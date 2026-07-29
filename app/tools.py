@@ -63,10 +63,29 @@ from fetch_xbrl_financials import (  # noqa: E402
 )
 from parent_child_retriever import build_parent_child_retriever  # noqa: E402
 from test_q1 import load_ticker_documents  # noqa: E402
-from test_q2 import format_results, search_tavily  # noqa: E402
-from test_q5 import CODE_LABELS, fetch_insider_transactions, within_window  # noqa: E402
 from test_q7 import find_hits  # noqa: E402
-from test_q8 import fetch_recommendation_trends, format_recommendation_trends  # noqa: E402
+
+# format_results/search_tavily, CODE_LABELS/fetch_insider_transactions/
+# within_window, and fetch_recommendation_trends/format_recommendation_trends
+# used to be imported directly from test_q2.py/test_q5.py/test_q8.py.
+# Real incident (2026-07-29): all three of those files import ragas at
+# module level (for their own run_case() eval scoring), and
+# requirements-server.txt deliberately excludes ragas -- so importing
+# ANYTHING from those files here executed `import ragas` at server
+# startup and crashed the deploy the moment ragas was correctly left out
+# of production. test_q1.py and test_q7.py were checked directly and
+# carry no such risk (no ragas/pytest/yfinance import anywhere in either),
+# so those two stay as direct imports above. See shared_helpers.py's
+# module docstring for the full writeup.
+from shared_helpers import (  # noqa: E402
+    CODE_LABELS,
+    fetch_insider_transactions,
+    fetch_recommendation_trends,
+    format_recommendation_trends,
+    format_results,
+    search_tavily,
+    within_window,
+)
 
 from app import db  # noqa: E402
 

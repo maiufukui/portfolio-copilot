@@ -18,14 +18,26 @@ from __future__ import annotations
 
 import argparse
 import os
-import time
 from datetime import datetime, timedelta
 
-import requests
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from ragas.messages import ToolCall
+
+# CODE_LABELS/fetch_insider_transactions/within_window moved to
+# shared_helpers.py 2026-07-29: app/tools.py (production) imported these
+# from this file, and this file imports ragas (above) for its own
+# run_case() scoring -- so any production import from this file pulled in
+# ragas at server startup, crashing the deploy the moment ragas was
+# correctly excluded from requirements-server.txt. See shared_helpers.py's
+# module docstring for the full incident writeup. Re-imported here (not
+# redefined) so this file's own CLI and run_scorecard.py see no change.
+from shared_helpers import (  # noqa: F401
+    CODE_LABELS,
+    fetch_insider_transactions,
+    within_window,
+)
 
 load_dotenv()
 
@@ -36,59 +48,6 @@ load_dotenv()
 # Same "one ticker list per script" debt as everywhere else in this repo,
 # not a new decision -- update alongside the others when a 7th lands.
 DEFAULT_TICKERS = ["MRVL", "AAPL", "ALAB", "NBIS", "PANW", "DELL"]
-
-# Common Form 4 transaction codes worth knowing:
-# S = open-market sale, P = open-market purchase, A = grant/award,
-# M = option exercise, F = tax withholding (shares withheld, not a real sale/buy)
-CODE_LABELS = {
-    "S": "SELL (open market)",
-    "P": "BUY (open market)",
-    "A": "Award/Grant",
-    "M": "Option Exercise",
-    "F": "Tax Withholding",
-    "G": "Gift",
-}
-
-
-# Caching added 2026-07-27 (Maiu, explicit call, same pattern as
-# app/tools.py's quote/news/earnings-date caches): this is called from
-# get_market_data on essentially every chat question, uncached, one of
-# four real contributors found in a caching audit to hitting Finnhub's
-# rate limit. 24h TTL -- Maiu's explicit call, accepting that a fresh
-# Form 4 filed today could sit unsurfaced for up to a day in exchange
-# for the call-volume reduction; flagged once as a real signal-latency
-# tradeoff for this specific one before applying it, not a silent
-# default.
-INSIDER_TTL_SECONDS = 86400  # 24 hours
-_INSIDER_CACHE: dict[str, tuple[float, list[dict]]] = {}
-
-
-def fetch_insider_transactions(symbol: str, api_key: str) -> list[dict]:
-    symbol = symbol.upper()
-    now = time.monotonic()
-    cached = _INSIDER_CACHE.get(symbol)
-    if cached and now - cached[0] < INSIDER_TTL_SECONDS:
-        return cached[1]
-
-    result = _fetch_insider_transactions_uncached(symbol, api_key)
-    _INSIDER_CACHE[symbol] = (now, result)
-    return result
-
-
-def _fetch_insider_transactions_uncached(symbol: str, api_key: str) -> list[dict]:
-    url = "https://finnhub.io/api/v1/stock/insider-transactions"
-    resp = requests.get(url, params={"symbol": symbol, "token": api_key}, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("data", [])
-
-
-def within_window(transaction_date: str, cutoff: datetime) -> bool:
-    try:
-        dt = datetime.strptime(transaction_date, "%Y-%m-%d")
-    except (TypeError, ValueError):
-        return False
-    return dt >= cutoff
 
 
 # --- Real automated scoring for Q4, added 2026-07-28 (Maiu, explicit

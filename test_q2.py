@@ -19,78 +19,28 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 
-import requests
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ragas.messages import ToolCall
 
+# search_tavily/extract_date_from_url/display_date/format_results moved to
+# shared_helpers.py 2026-07-29: app/tools.py (production) imported
+# format_results/search_tavily from this file, and this file imports ragas
+# (below) for its own run_case() scoring -- so any production import from
+# this file pulled in ragas at server startup, crashing the deploy the
+# moment ragas was correctly excluded from requirements-server.txt. See
+# shared_helpers.py's module docstring for the full incident writeup.
+# Re-imported here (not redefined) so this file's own CLI (`python
+# test_q2.py --ticker ...`) and existing external importers
+# (fetch_transcripts.py, run_scorecard.py) see no change in behavior.
+from shared_helpers import display_date, format_results, search_tavily  # noqa: F401
+
 load_dotenv()
 
 DATASET_PATH = "eval_dataset.json"
-
-TAVILY_URL = "https://api.tavily.com/search"
-
-
-def search_tavily(
-    query: str,
-    api_key: str,
-    time_range: str = "week",
-    max_results: int = 8,
-    topic: str = "news",
-) -> list[dict]:
-    """Hit Tavily's /search endpoint. topic='news' + time_range filters to
-    recent news rather than general web results."""
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-    payload = {
-        "query": query,
-        "topic": topic,
-        "time_range": time_range,
-        "max_results": max_results,
-        "search_depth": "advanced",
-        "include_answer": False,
-    }
-    resp = requests.post(TAVILY_URL, headers=headers, json=payload, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("results", [])
-
-
-DATE_IN_URL_RE = re.compile(r"/(\d{4})/(\d{1,2})/(\d{1,2})/")
-
-
-def extract_date_from_url(url: str) -> str | None:
-    """Fallback only: Tavily's 'general' topic often omits published_date, but
-    many financial news URLs embed a YYYY/MM/DD path segment. Not an
-    authoritative source -- always labeled 'inferred from URL' so it's never
-    mistaken for a verified publish date."""
-    if not url:
-        return None
-    match = DATE_IN_URL_RE.search(url)
-    if not match:
-        return None
-    year, month, day = match.groups()
-    return f"{year}-{int(month):02d}-{int(day):02d} (inferred from URL)"
-
-
-def display_date(r: dict) -> str:
-    return r.get("published_date") or extract_date_from_url(r.get("url", "")) or "date unknown"
-
-
-def format_results(results: list[dict]) -> str:
-    lines = []
-    for r in results:
-        title = r.get("title", "untitled")
-        url = r.get("url", "")
-        score = r.get("score")
-        content = (r.get("content") or "")[:500]
-        lines.append(
-            f"Title: {title}\nDate: {display_date(r)}\nRelevance score: {score}\nURL: {url}\nExcerpt: {content}"
-        )
-    return "\n\n".join(lines)
 
 
 RELEVANCE_PROMPT = ChatPromptTemplate.from_messages(

@@ -7,8 +7,9 @@ guidance cut) for a ticker, then synthesizes an answer that explicitly
 separates company statements from analyst commentary, each with dated,
 sourced citations -- matching the eval's expected behavior spec.
 
-Reuses search_tavily/format_results from test_q2.py rather than
-duplicating the Tavily call.
+Reuses search_tavily/format_results from shared_helpers.py rather than
+duplicating the Tavily call (moved there from test_q2.py 2026-07-29 --
+see shared_helpers.py's module docstring).
 
 Usage:
     python test_q8.py --ticker ALAB --company "Astera Labs" --event "guidance cut"
@@ -19,74 +20,32 @@ from __future__ import annotations
 
 import argparse
 import os
-import time
 
-import requests
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ragas.messages import ToolCall
 
-from test_q2 import display_date, format_results, search_tavily
+# fetch_recommendation_trends/format_recommendation_trends moved to
+# shared_helpers.py 2026-07-29 (same incident as test_q2.py/test_q5.py --
+# see shared_helpers.py's module docstring): app/tools.py (production)
+# imported these from this file, and this file imports ragas (above) for
+# its own run_case() scoring, so any production import from this file
+# pulled in ragas at server startup. display_date/format_results/
+# search_tavily now also come from shared_helpers directly rather than
+# via test_q2 -- test_q2.py itself still imports ragas at module level for
+# ITS OWN run_case(), so importing through it here would just move the
+# same problem one file over rather than fixing it.
+from shared_helpers import (  # noqa: F401
+    display_date,
+    fetch_recommendation_trends,
+    format_recommendation_trends,
+    format_results,
+    search_tavily,
+)
 
 load_dotenv()
-
-FINNHUB_RECOMMENDATION_URL = "https://finnhub.io/api/v1/stock/recommendation"
-
-
-# Caching added 2026-07-27 (Maiu, explicit call) -- same audit/pattern as
-# test_q5.py's fetch_insider_transactions. 24h TTL is a lower-risk call
-# than insider transactions specifically: Finnhub's own recommendation
-# data is an aggregated monthly-cadence consensus, not something that
-# actually updates intraday, so a day-old cache isn't giving up real
-# freshness the source itself doesn't already lack.
-RECOMMENDATION_TTL_SECONDS = 86400  # 24 hours
-_RECOMMENDATION_CACHE: dict[str, tuple[float, list[dict]]] = {}
-
-
-def fetch_recommendation_trends(ticker: str, api_key: str) -> list[dict]:
-    """Real institutional analyst consensus (aggregated buy/hold/sell counts
-    from actual sell-side coverage) -- not scraped from the open web. Free
-    tier. Most recent period first. Cached per ticker for
-    RECOMMENDATION_TTL_SECONDS -- see comment above."""
-    ticker = ticker.upper()
-    now = time.monotonic()
-    cached = _RECOMMENDATION_CACHE.get(ticker)
-    if cached and now - cached[0] < RECOMMENDATION_TTL_SECONDS:
-        return cached[1]
-
-    result = _fetch_recommendation_trends_uncached(ticker, api_key)
-    _RECOMMENDATION_CACHE[ticker] = (now, result)
-    return result
-
-
-def _fetch_recommendation_trends_uncached(ticker: str, api_key: str) -> list[dict]:
-    resp = requests.get(FINNHUB_RECOMMENDATION_URL, params={"symbol": ticker, "token": api_key}, timeout=15)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def format_recommendation_trends(trends: list[dict]) -> str:
-    if not trends:
-        return "No institutional recommendation-trend data available for this ticker."
-    lines = []
-    for t in trends[:2]:  # most recent + one prior period, for trend direction
-        total = (
-            t.get("strongBuy", 0)
-            + t.get("buy", 0)
-            + t.get("hold", 0)
-            + t.get("sell", 0)
-            + t.get("strongSell", 0)
-        )
-        lines.append(
-            f"Period {t.get('period')}: {total} analyst(s) covering -- "
-            f"Strong Buy: {t.get('strongBuy', 0)}, Buy: {t.get('buy', 0)}, "
-            f"Hold: {t.get('hold', 0)}, Sell: {t.get('sell', 0)}, "
-            f"Strong Sell: {t.get('strongSell', 0)}"
-        )
-    return "\n".join(lines)
-
 
 # --- Eval Q8: "Have analysts changed their rating on {company} recently?" ---
 # Distinct from the Q6 driver above: no event, no Tavily search -- just Finnhub
