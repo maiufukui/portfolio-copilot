@@ -132,7 +132,23 @@ def _get_documents(ticker: str) -> list:
     return documents
 
 
-def _get_retriever(ticker: str):
+def get_retriever(ticker: str):
+    """Made public (renamed from _get_retriever) 2026-07-28, Maiu, real
+    bug found in a live run_scorecard.py run: run_eval.py used to keep
+    its OWN separate, never-released on-disk Qdrant client per ticker for
+    RAG scoring (Q1/Q5), independent of this module's cache. When one
+    process ran Q1's scoring followed by any live-agent question (Q3/Q7/
+    Q9/Q10, which call search_filings -> this function), the live agent's
+    call tried to open the SAME ticker's on-disk Qdrant directory a
+    second time in the same process and hit Qdrant's local-mode exclusive
+    file lock -- confirmed via a real run's own printed warnings for
+    every ticker touched after Q1 ("already accessed by another instance
+    of Qdrant client... falling back to an in-memory build... will
+    re-embed via OpenAI"). run_eval.py's _get_cached_retriever now
+    delegates here instead of maintaining a second cache, so there's
+    exactly one retriever (one open Qdrant client) per ticker per
+    process, shared by RAG scoring and the live agent both -- this is
+    the real fix, not a workaround around the symptom."""
     ticker = ticker.upper()
     if ticker in _RETRIEVER_CACHE:
         cache_stats["retriever_hits"] += 1
@@ -187,7 +203,7 @@ def search_filings(ticker: str, query: str) -> str:
     guidance sentence, even though the real sentence was present and
     retrievable -- the reranker needs this explicit signal to prefer it.
     """
-    retriever = _get_retriever(ticker)
+    retriever = get_retriever(ticker)
     docs = retriever(query, k=5)
     if not docs:
         return f"No relevant passages found in {ticker}'s indexed filings for: {query}"

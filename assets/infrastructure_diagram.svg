@@ -1,6 +1,6 @@
-<svg viewBox="0 0 1160 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="infraTitle infraDesc">
+<svg viewBox="0 0 1370 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="infraTitle infraDesc">
   <title id="infraTitle">Personal Portfolio Copilot — Infrastructure Diagram</title>
-  <desc id="infraDesc">Five-tier architecture: Next.js UI on Render calls a FastAPI/LangGraph backend with an in-memory checkpointer; the backend routes model calls through a Portkey gateway to GPT-4.1 mini, and calls four tools directly — Qdrant vector search, keyword/exact-match search, Tavily live search, Finnhub market data, and SEC EDGAR filings/XBRL; LangSmith observes the backend via traces.</desc>
+  <desc id="infraDesc">Six-tier architecture: Next.js UI on Render calls a FastAPI/LangGraph backend with a Postgres-backed checkpointer (PostgresSaver in production; MemorySaver only as a local-dev fallback when DATABASE_URL is unset); the backend routes model calls through a Portkey gateway to GPT-4.1 mini, and calls six data/tool sources directly — Qdrant vector search, keyword/exact-match search, Tavily live search, Finnhub market data, SEC EDGAR filings/XBRL, and Postgres (price_snapshots and holdings tables, live and wired). A planned, schema-only persistent-memory tier in the same Postgres instance (health_score_history, user_memory with a memory_type column, news_dedup) is shown dashed/greyed as not-yet-wired, the intended home for episodic/procedural/semantic memory. LangSmith observes the backend via traces.</desc>
   <defs>
     <style>
       :root{
@@ -9,13 +9,16 @@
         --lane-be:#fff8e6; --stroke-be:#f9ab00;
         --lane-llm:#eafbf0; --stroke-llm:#34a853;
         --lane-data:#fdedec; --stroke-data:#ea4335;
+        --lane-plan:#f1f3f4; --stroke-plan:#9aa0a6;
         --lane-mon:#f5f0fd; --stroke-mon:#a142f4;
         --text:#202124; --text-muted:#5f6368; --arrow:#80868b; --box-fill:#ffffff;
       }
       .lane-label{ font: 600 12px -apple-system,Helvetica,Arial,sans-serif; letter-spacing:.06em; fill:var(--text-muted); text-transform:uppercase; }
       .box-title{ font: 700 14px -apple-system,Helvetica,Arial,sans-serif; fill:var(--text); }
+      .box-title-muted{ font: 700 14px -apple-system,Helvetica,Arial,sans-serif; fill:var(--text-muted); }
       .box-sub{ font: 400 11px -apple-system,Helvetica,Arial,sans-serif; fill:var(--text-muted); }
       .box{ fill:var(--box-fill); stroke-width:1.75; }
+      .box-dashed{ fill:var(--box-fill); stroke-width:1.75; stroke-dasharray:6 4; }
       .conn{ fill:none; stroke:var(--arrow); stroke-width:1.75; }
       .conn-dashed{ fill:none; stroke:var(--arrow); stroke-width:1.75; stroke-dasharray:5 4; }
     </style>
@@ -24,39 +27,39 @@
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1160" height="700" fill="var(--bg)"/>
+  <rect x="0" y="0" width="1370" height="800" fill="var(--bg)"/>
 
   <!-- Lane 1: UI -->
-  <rect x="20" y="20" width="1120" height="90" rx="10" fill="var(--lane-ui)" stroke="var(--lane-ui)"/>
+  <rect x="20" y="20" width="1330" height="90" rx="10" fill="var(--lane-ui)" stroke="var(--lane-ui)"/>
   <text x="36" y="38" class="lane-label">User Interface</text>
-  <rect x="460" y="37" width="240" height="56" rx="8" class="box" stroke="var(--stroke-ui)"/>
-  <text x="580" y="60" class="box-title" text-anchor="middle">Next.js Chat UI</text>
-  <text x="580" y="78" class="box-sub" text-anchor="middle">Render — phone &amp; laptop</text>
+  <rect x="565" y="37" width="240" height="56" rx="8" class="box" stroke="var(--stroke-ui)"/>
+  <text x="685" y="60" class="box-title" text-anchor="middle">Next.js Chat UI</text>
+  <text x="685" y="78" class="box-sub" text-anchor="middle">Render — phone &amp; laptop</text>
 
   <!-- Lane 2: Backend -->
-  <rect x="20" y="125" width="1120" height="110" rx="10" fill="var(--lane-be)" stroke="var(--lane-be)"/>
+  <rect x="20" y="125" width="1330" height="110" rx="10" fill="var(--lane-be)" stroke="var(--lane-be)"/>
   <text x="36" y="143" class="lane-label">Backend — Render</text>
-  <rect x="340" y="150" width="260" height="60" rx="8" class="box" stroke="var(--stroke-be)"/>
-  <text x="470" y="176" class="box-title" text-anchor="middle">FastAPI + LangGraph</text>
-  <text x="470" y="195" class="box-sub" text-anchor="middle">Orchestrator</text>
-  <rect x="620" y="150" width="200" height="60" rx="8" class="box" stroke="var(--stroke-be)"/>
-  <text x="720" y="176" class="box-title" text-anchor="middle">Checkpointer</text>
-  <text x="720" y="195" class="box-sub" text-anchor="middle">MemorySaver · in-memory</text>
-  <path class="conn" marker-end="url(#arrow)" d="M600,180 L620,180"/>
+  <rect x="445" y="150" width="260" height="60" rx="8" class="box" stroke="var(--stroke-be)"/>
+  <text x="575" y="176" class="box-title" text-anchor="middle">FastAPI + LangGraph</text>
+  <text x="575" y="195" class="box-sub" text-anchor="middle">Orchestrator</text>
+  <rect x="725" y="150" width="200" height="60" rx="8" class="box" stroke="var(--stroke-be)"/>
+  <text x="825" y="176" class="box-title" text-anchor="middle">Checkpointer</text>
+  <text x="825" y="195" class="box-sub" text-anchor="middle">PostgresSaver · Postgres</text>
+  <path class="conn" marker-end="url(#arrow)" d="M705,180 L725,180"/>
 
   <!-- Lane 3: LLM Layer -->
-  <rect x="20" y="250" width="1120" height="110" rx="10" fill="var(--lane-llm)" stroke="var(--lane-llm)"/>
+  <rect x="20" y="250" width="1330" height="110" rx="10" fill="var(--lane-llm)" stroke="var(--lane-llm)"/>
   <text x="36" y="268" class="lane-label">LLM Layer</text>
-  <rect x="360" y="275" width="200" height="60" rx="8" class="box" stroke="var(--stroke-llm)"/>
-  <text x="460" y="301" class="box-title" text-anchor="middle">Portkey Gateway</text>
-  <text x="460" y="319" class="box-sub" text-anchor="middle">LLM gateway routing</text>
-  <rect x="620" y="275" width="200" height="60" rx="8" class="box" stroke="var(--stroke-llm)"/>
-  <text x="720" y="301" class="box-title" text-anchor="middle">GPT-4.1 mini</text>
-  <text x="720" y="319" class="box-sub" text-anchor="middle">every model call</text>
-  <path class="conn" marker-end="url(#arrow)" d="M560,305 L620,305"/>
+  <rect x="465" y="275" width="200" height="60" rx="8" class="box" stroke="var(--stroke-llm)"/>
+  <text x="565" y="301" class="box-title" text-anchor="middle">Portkey Gateway</text>
+  <text x="565" y="319" class="box-sub" text-anchor="middle">LLM gateway routing</text>
+  <rect x="725" y="275" width="200" height="60" rx="8" class="box" stroke="var(--stroke-llm)"/>
+  <text x="825" y="301" class="box-title" text-anchor="middle">GPT-4.1 mini</text>
+  <text x="825" y="319" class="box-sub" text-anchor="middle">every model call</text>
+  <path class="conn" marker-end="url(#arrow)" d="M665,305 L725,305"/>
 
   <!-- Lane 4: Data & Tools -->
-  <rect x="20" y="380" width="1120" height="150" rx="10" fill="var(--lane-data)" stroke="var(--lane-data)"/>
+  <rect x="20" y="380" width="1330" height="150" rx="10" fill="var(--lane-data)" stroke="var(--lane-data)"/>
   <text x="36" y="398" class="lane-label">Data &amp; Tools</text>
 
   <rect x="65" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
@@ -79,26 +82,59 @@
   <text x="1000" y="447" class="box-title" text-anchor="middle">SEC EDGAR</text>
   <text x="1000" y="465" class="box-sub" text-anchor="middle">filings + XBRL</text>
 
-  <!-- Lane 5: Monitoring -->
-  <rect x="20" y="545" width="1120" height="90" rx="10" fill="var(--lane-mon)" stroke="var(--lane-mon)"/>
-  <text x="36" y="563" class="lane-label">Monitoring</text>
-  <rect x="460" y="567" width="240" height="56" rx="8" class="box" stroke="var(--stroke-mon)"/>
-  <text x="580" y="590" class="box-title" text-anchor="middle">LangSmith</text>
-  <text x="580" y="608" class="box-sub" text-anchor="middle">traces every LangGraph run</text>
+  <rect x="1115" y="420" width="190" height="64" rx="8" class="box" stroke="var(--stroke-data)"/>
+  <text x="1210" y="447" class="box-title" text-anchor="middle">Postgres (Render)</text>
+  <text x="1210" y="465" class="box-sub" text-anchor="middle">price_snapshots · holdings</text>
+
+  <!-- Lane 5: Persistent Memory (planned, schema only) -->
+  <rect x="20" y="545" width="1330" height="110" rx="10" fill="var(--lane-plan)" stroke="var(--lane-plan)"/>
+  <text x="36" y="563" class="lane-label">Persistent Memory (planned — schema only)</text>
+
+  <rect x="360" y="570" width="190" height="60" rx="8" class="box-dashed" stroke="var(--stroke-plan)"/>
+  <text x="455" y="594" class="box-title-muted" text-anchor="middle">health_score_history</text>
+  <text x="455" y="612" class="box-sub" text-anchor="middle">not wired — status audit trail</text>
+
+  <rect x="590" y="570" width="190" height="60" rx="8" class="box-dashed" stroke="var(--stroke-plan)"/>
+  <text x="685" y="594" class="box-title-muted" text-anchor="middle">user_memory</text>
+  <text x="685" y="612" class="box-sub" text-anchor="middle">not wired — memory_type column:</text>
+  <text x="685" y="624" class="box-sub" text-anchor="middle">episodic / procedural / semantic</text>
+
+  <rect x="820" y="570" width="190" height="60" rx="8" class="box-dashed" stroke="var(--stroke-plan)"/>
+  <text x="915" y="594" class="box-title-muted" text-anchor="middle">news_dedup</text>
+  <text x="915" y="612" class="box-sub" text-anchor="middle">not wired — news de-dup cache</text>
+
+  <!-- Postgres (Data & Tools) -> planned memory tables, same instance -->
+  <!-- Bus routed in the gap ABOVE the lane (y=538, between Data & Tools'
+       bottom at 530 and this lane's top at 545) so it never crosses the
+       lane label text, same convention as the Data & Tools fan-out bus
+       above (which sits in the gap at y=370, not inside its own lane). -->
+  <path class="conn-dashed" d="M1210,484 L1210,538"/>
+  <path class="conn-dashed" d="M455,538 L1210,538"/>
+  <path class="conn-dashed" marker-end="url(#arrow)" d="M455,538 L455,570"/>
+  <path class="conn-dashed" marker-end="url(#arrow)" d="M685,538 L685,570"/>
+  <path class="conn-dashed" marker-end="url(#arrow)" d="M915,538 L915,570"/>
+
+  <!-- Lane 6: Monitoring -->
+  <rect x="20" y="670" width="1330" height="90" rx="10" fill="var(--lane-mon)" stroke="var(--lane-mon)"/>
+  <text x="36" y="688" class="lane-label">Monitoring</text>
+  <rect x="565" y="692" width="240" height="56" rx="8" class="box" stroke="var(--stroke-mon)"/>
+  <text x="685" y="715" class="box-title" text-anchor="middle">LangSmith</text>
+  <text x="685" y="733" class="box-sub" text-anchor="middle">traces every LangGraph run</text>
 
   <!-- Flow connectors -->
-  <path class="conn" marker-end="url(#arrow)" d="M580,93 L580,110 L470,110 L470,150"/>
-  <path class="conn" marker-end="url(#arrow)" d="M470,210 L470,242 L460,242 L460,275"/>
+  <path class="conn" marker-end="url(#arrow)" d="M685,93 L685,110 L575,110 L575,150"/>
+  <path class="conn" marker-end="url(#arrow)" d="M575,210 L575,242 L565,242 L565,275"/>
 
   <!-- Backend -> tool bus (fan-out to Data & Tools) -->
-  <path class="conn" d="M340,190 L200,190 L200,370"/>
-  <path class="conn" d="M200,370 L1000,370"/>
+  <path class="conn" d="M445,190 L200,190 L200,370"/>
+  <path class="conn" d="M160,370 L1210,370"/>
   <path class="conn" marker-end="url(#arrow)" d="M160,370 L160,420"/>
   <path class="conn" marker-end="url(#arrow)" d="M370,370 L370,420"/>
   <path class="conn" marker-end="url(#arrow)" d="M580,370 L580,420"/>
   <path class="conn" marker-end="url(#arrow)" d="M790,370 L790,420"/>
   <path class="conn" marker-end="url(#arrow)" d="M1000,370 L1000,420"/>
+  <path class="conn" marker-end="url(#arrow)" d="M1210,370 L1210,420"/>
 
   <!-- Backend -> Monitoring (observability, dashed) -->
-  <path class="conn-dashed" marker-end="url(#arrow)" d="M820,180 L1112,180 L1112,595 L700,595"/>
+  <path class="conn-dashed" marker-end="url(#arrow)" d="M925,180 L1322,180 L1322,720 L805,720"/>
 </svg>

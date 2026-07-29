@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-14T13:22:59.991945+00:00",
+  "generated_at": "2026-07-29T02:25:05.355307+00:00",
   "questions": {
     "1": {
       "status": "scored",
@@ -8,74 +8,158 @@
       "scored_by": "RAGAS (faithfulness, context_recall, factual_correctness)",
       "cases": [
         {
-          "case": "this quarter's gross margin change",
+          "case": "gross margin",
+          "response": "This quarter: GAAP gross margin 76.3%  \nNext quarter guidance: Not provided in the context  \nComparison: Guidance for next quarter is not available in the provided context, so no comparison can be made.  \nSource: \"GAAP gross margin 76.3%\" (from the three months ended March 31, 2026 financials); no forward-looking gross margin guidance was included in the excerpts.",
           "faithfulness": 1.0,
+          "context_recall": 0.5,
+          "factual_correctness(mode=f1)": 0.0
+        },
+        {
+          "case": "gross margin",
+          "response": "This quarter: Total gross margin percentage 49.3%  \nNext quarter guidance: Not provided in the context  \nComparison: Guidance for next quarter is not available in the provided context, so no comparison can be made.  \nSource: \"Products and Services gross margin and gross margin percentage for the three- and six-month periods ended March 28, 2026 and March 29, 2025, were as follows... Total gross margin percentage 49.3%\" and \"The Company\u2019s future gross margins can be impacted by a variety of factors... As a result, the Company believes, in general, gross margins will be subject to volatility and downward pressure.\" (no explicit next quarter guidance given)",
+          "faithfulness": 1.0,
+          "context_recall": 0.5,
+          "factual_correctness(mode=f1)": 0.32
+        },
+        {
+          "case": "data center revenue growth",
+          "response": "This quarter: Data center revenue growth of 50% year over year  \nNext quarter guidance: Data center revenue growth expected to continue strong with overall company revenue to grow 12% sequentially and 35% year over year at the midpoint for Q2 fiscal 27  \nComparison: Guidance represents an improvement in sequential growth (12% sequential vs. 9% sequential reported last quarter) driven by strong demand and exceptional bookings across the entire data center portfolio.  \nSource: \"Marvell delivered record revenue of $2.418 billion reflecting 9% sequential and 28% year over year growth.\" / \"This robust demand is reflected in our guidance for the second quarter of 27, which we expect total company revenue to grow 12% sequentially and 35% year over year at the midpoint.\"",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.22
+        },
+        {
+          "case": "adjusted EBITDA margin",
+          "response": "This quarter: Nebius AI adjusted EBITDA margin reached 45%  \nNext quarter guidance: Margins in Q2 expected to go a little bit lower than Q1  \nComparison: Worse, due to timing of investments in Q2 landing first while the capacity and revenue they support come online later  \nSource: \"Nebius AI adjusted EBITDA margin reached 45%, nearly doubling from Q4.\" / \"Given the timing of our investments in Q2 and the timing of the deployment towards the end of the quarter, we actually expect those margins in Q2 to go a little bit lower...\"",
+          "faithfulness": 1.0,
+          "context_recall": 1.0,
+          "factual_correctness(mode=f1)": 0.6
+        },
+        {
+          "case": "gross margin",
+          "response": "This quarter: 67.6% gross margin for the three months ended April 30, 2026  \nNext quarter guidance: 67% to 68% gross margin  \nComparison: Roughly flat, as management expects gross margin to be stable next quarter due to continued investments in product innovation and cloud infrastructure costs.  \nSource: \u201cTotal gross margin was 67.6% for the third quarter ended April 30, 2026.\u201d and \u201cFor the fourth quarter, we expect gross margin to be in the range of 67% to 68%.\u201d",
+          "faithfulness": 0.75,
           "context_recall": 0.0,
-          "factual_correctness(mode=f1)": 0.29
+          "factual_correctness(mode=f1)": 0.0
         },
         {
-          "case": "next quarter's gross margin guidance",
+          "case": "gross margin",
+          "response": "This quarter: Gross margin percentage decreased 330 basis points to 17.8%  \nNext quarter guidance: Not explicitly provided in the context  \nComparison: Guidance for next quarter gross margin is not stated in the provided context, so no direct comparison can be made.  \nSource: \"During the first quarter of Fiscal 2027, gross margin percentage and non-GAAP gross margin percentage decreased 330 basis points to 17.8% and 350 basis points to 18.1%, respectively.\"  \n\"No explicit gross margin guidance for the next quarter was found in the provided excerpts.\"",
           "faithfulness": 1.0,
           "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 1.0
-        },
-        {
-          "case": "this quarter's gross margin change",
-          "faithfulness": 1.0,
-          "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.76
-        },
-        {
-          "case": "next quarter's gross margin guidance",
-          "faithfulness": 1.0,
-          "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.5
-        },
-        {
-          "case": "this quarter's data center revenue growth",
-          "faithfulness": 1.0,
-          "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.11
-        },
-        {
-          "case": "fiscal 2028 data center revenue growth guidance",
-          "faithfulness": 1.0,
-          "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.78
-        },
-        {
-          "case": "this quarter's adjusted EBITDA margin change",
-          "faithfulness": 0.9333333333333333,
-          "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.38
-        },
-        {
-          "case": "next quarter's margin guidance",
-          "faithfulness": 1.0,
-          "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.81
+          "factual_correctness(mode=f1)": 0.4
         }
       ],
       "mean": {
-        "faithfulness": 0.9916666666666667,
-        "context_recall": 0.875,
-        "factual_correctness(mode=f1)": 0.57875
+        "faithfulness": 0.9583333333333334,
+        "context_recall": 0.6666666666666666,
+        "factual_correctness(mode=f1)": 0.25666666666666665
       }
     },
     "2": {
+      "status": "scored",
       "id": 2,
-      "status": "not_scored",
-      "reason": "test_q2.py prints an LLM relevance list (High/Medium/Low) for manual review -- no judge, no metric."
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "cases": [
+        {
+          "case": "ALAB",
+          "response": "The latest news on Astera Labs (ALAB) shows the company expanding its Taiwan operations and Cloud-Scale Interop Lab to collaborate with leading AI platform providers and Taiwan-based system manufacturers on AI infrastructure deployments. They are also working with major partners like AMD, Arm, Intel, and NVIDIA on the UALink 2.0 specification focused on scalability, security, and resiliency for AI compute fabrics. This indicates ongoing strategic growth in AI infrastructure. (Source: simplywall.st, 26 Jul 2026)\n\nHowever, the stock has recently declined significantly, dropping about 20.4% over the past week and 46.1% over the past month, closing at $260.23 on July 28, 2026. Insider selling has been notable, with multiple open market sales by insiders at prices around $450-$467 per share in the last 30 days. This insider activity aligns with your fundamentals health score, which currently flags insider activity as \"at risk.\" (Source: market data)\n\nAnalyst recommendations remain stable with no sell ratings, and the company is scheduled to report earnings on August 4, 2026.\n\nRegarding your position, the fundamentals health score remains \"at risk\" mainly due to insider selling, despite strong revenue growth and intact leadership. The recent stock price decline and insider selling suggest caution, but the company's strategic moves in AI infrastructure are positive. Monitoring upcoming earnings and insider activity will be important for assessing future risk.",
+          "ragas_tool_call_accuracy": 0.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "live_search_used: PASS -- The response includes specific recent news dated July 26, 2026, indicating a live search was performed.  \nrelevance_assessment: PASS -- The agent connects the news and insider selling to the user's position, advising caution and monitoring, not just listing headlines.  \ncitation_quality: PASS -- Each news item and data point is attributed to a source and date, such as simplywall.st (26 Jul 2026) and market data.",
+          "coverage": null
+        },
+        {
+          "case": "NBIS",
+          "response": "The latest news on Nebius (NBIS) from the past week highlights that the company remains highly compelling due to its exceptional cash flow generation and strong positioning in AI infrastructure. The 2026 revenue guidance is $3.4 billion, with a very strong 550% year-over-year growth outlook and a 13x sales valuation. However, key risks include potential growth deceleration in 2027 and ongoing equity dilution to fund aggressive capital expenditures.\n\nThe stock has experienced a significant decline recently, dropping about 21.8% over the last week and about 29.4% over the last month, closing at $169.69 on July 28, 2026. Insider activity shows substantial open market selling by insiders totaling over $24 million in the last 30 days, which aligns with your fundamentals health score's \"monitor\" status on insider activity. Leadership remains intact with no recent changes reported.\n\nOverall, this news confirms the growth potential but also highlights risks and insider selling, consistent with your current fundamentals health score of \"monitor.\" The recent price drop and insider selling suggest caution, and the upcoming earnings report on July 29, 2026, may provide further insight.\n\nSources:\n- Seeking Alpha article (2026-07-27): https://seekingalpha.com/article/4925852-nebius-stock-exceptional-cash-flow-generation-ai-infrastructure-positioning\n- Market data and insider transactions for NBIS (2026-07-28)",
+          "ragas_tool_call_accuracy": 0.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "live_search_used: PASS -- The response includes recent news details and market data dated July 27-28, 2026, indicating a live search was performed.  \nrelevance_assessment: PASS -- The agent connects the news to the user's position by discussing insider selling, price decline, and fundamentals health score implications.  \ncitation_quality: PASS -- Each key news item is attributed to a specific source and date, including Seeking Alpha and market data timestamps.",
+          "coverage": null
+        }
+      ],
+      "mean": {
+        "ragas_tool_call_accuracy": 0.0,
+        "ragas_goal_accuracy": 1.0
+      }
     },
     "3": {
+      "status": "scored",
       "id": 3,
-      "status": "not_built",
-      "reason": "not built"
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge only (no RAGAS metric wired in for this question yet)",
+      "cases": [
+        {
+          "case": "ALAB",
+          "response": "Astera Labs's latest earnings and guidance do not indicate any immediate concerns around margin or outlook. The company reported strong Q1 2026 GAAP gross margin of 76.3% and operating margin of 20.1%, with non-GAAP margins also improving. Guidance for Q4 2025 gross margin is around 75%, and Q2 2026 revenue is expected between $355 million and $365 million with non-GAAP EPS of $0.68 to $0.70, continuing a pattern of beating revenue estimates.\n\nThere is a noted 200 basis point non-cash impact from a customer warrant agreement included in margin guidance, so underlying margins are expected near 75%, indicating stable margin expectations. The company benefits from strong AI infrastructure spending by major hyperscalers, supporting growth and margin stability.\n\nWhile the fundamentals health score flags margin as \"monitor,\" the latest earnings and guidance show no new margin risks or negative surprises. Overall, there is nothing in the latest earnings or guidance that should cause worry about margins or the company's outlook moving forward.\n\nSources: Astera Labs Q1 2026 10-Q, earnings call transcript, Simply Wall St and TIKR.com July 2026 reports.",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response directly references Astera Labs's latest earnings details on margins and guidance without drifting into generic advice or vague reassurance.  \ngoal_accuracy: PASS -- The response cites specific margin figures, guidance ranges, and the non-cash impact disclosure, clearly stating there is no margin or guidance concern.  \ntool_call_accuracy: PASS -- The response uses data from the Q1 2026 10-Q, earnings call transcript, and margin health score, indicating the tools were used to check actual filings and reports."
+        },
+        {
+          "case": "AAPL",
+          "response": "Apple's latest earnings and filings indicate that the company is currently maintaining strong margins, with a gross margin of 49.3% in the most recent quarter, which includes tariff-related costs. However, management highlighted ongoing risks that could impact margins going forward. These risks include supply constraints and rising costs for components such as advanced semiconductors, NAND storage, and DRAM memory. The company expects these supply and cost pressures to intensify, which could negatively affect demand, revenue, costs, and gross margin.\n\nAdditionally, tariffs remain a factor, though recent tariff rate reductions and ongoing refund applications have somewhat mitigated the impact. Apple plans to reinvest any tariff refunds into US innovation and manufacturing.\n\nWhile no explicit downward margin guidance was provided, management expressed some uncertainty about margin variability beyond the current quarter due to these external factors.\n\nOverall, there is no immediate cause for concern in Apple's fundamentals or margin outlook, but the company signals caution about supply chain and cost risks that could pressure margins in the future. This aligns with the current Fundamentals Health Score, which rates Apple's margin status as intact and even improving recently.\n\nTherefore, while margins remain strong now, it is prudent to monitor supply chain and tariff developments as potential risks to future margin stability.\n\nSources: Apple Q2 2026 Form 10-Q, Q2 2026 earnings call transcript, and 2025 Form 10-K.",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response directly references Apple's latest earnings details on margins, supply risks, tariffs, and guidance language without drifting into generic advice.  \ngoal_accuracy: PASS -- The response cites specific margin figures (49.3%), management commentary on risks, and the absence of explicit downward guidance, providing concrete evidence from the latest quarter.  \ntool_call_accuracy: PASS -- The response clearly draws from the latest filings and earnings call transcript as indicated, consistent with the tool called (search_filings)."
+        },
+        {
+          "case": "MRVL",
+          "response": "Marvell's latest earnings show strong revenue growth driven by AI-related demand, with revenue up 27.6% year-over-year to $2.42 billion and raised guidance for fiscal 2027 and 2028, expecting about 40% and 45% revenue growth respectively. However, there is some margin pressure to monitor: non-GAAP gross margin was 58.9% this quarter, down from 59.8% a year ago, and consensus expects gross margin to gradually decline to around 57% by fiscal 2029. This margin compression is linked to growth in custom silicon and scale-up revenue, which tend to have lower margins. While the company\u2019s margin remains strong and intact currently, this potential medium-term margin decline is a risk factor to watch. Overall, the fundamentals health score aligns with this, showing margin intact but an overall monitor status due to leadership and insider activity. So, no immediate margin or guidance red flags, but margin pressure over time and external risks warrant attention.\n\n(Source: Marvell 10-Q May 2026; MarketBeat 2026-07-28; TIKR.com 2026-07-26)",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response directly references Marvell's latest earnings figures, margin trends, and guidance, staying focused on the user's specific concerns.  \ngoal_accuracy: PASS -- The response cites exact revenue growth percentages, current and expected gross margin figures, and links margin pressure to specific business segments, providing concrete evidence from the earnings.  \ntool_call_accuracy: PASS -- The response references specific filings (Marvell 10-Q May 2026) and recent news sources consistent with the tools called, indicating the agent used the appropriate sources."
+        },
+        {
+          "case": "NBIS",
+          "response": "Nebius's latest Q1 2026 earnings call indicates strong margin performance but also highlights expected short-term margin variability due to timing of investments and capacity deployment. The company reported a 45% adjusted EBITDA margin for its AI business in Q1, nearly doubling from Q4. However, margins are expected to dip in Q2 because investments in hiring, acquisitions, and product development are already in the cost base, while the revenue from the capacity these investments support will come online later in the year. Margins are forecasted to return to Q1 levels in Q3 and improve further in Q4. The full-year adjusted EBITDA margin guidance remains around 40%.\n\nNebius reiterated its full-year 2026 guidance for annualized run rate revenue of $7 billion to $9 billion, group revenue between $3 billion and $3.4 billion, and group adjusted EBITDA margin of around 40%. Utilization and pricing are not currently limiting growth, but capacity deployment timing will impact quarterly margin progression.\n\nThe company raised its 2026 capital expenditure guidance to $20 billion to $25 billion from a prior range of $16 billion to $20 billion to support additional AI infrastructure capacity, reflecting aggressive growth plans and building for 2027 demand with customer commitments already in place.\n\nNebius has a strong balance sheet with $9.3 billion in cash and equivalents and has secured over 90% of its CapEx range through cash and contractual commitments. Financing plans include asset-backed financing, corporate debt, and possibly equity issuance, with disciplined capital structure management.\n\nIn summary, the expected margin softness in Q2 is a timing issue related to upfront investments ahead of capacity coming online, not a structural margin problem. The company remains confident in its full-year margin and revenue guidance. The increased CapEx and financing plans reflect aggressive growth and capacity expansion to meet strong demand, managed with clear visibility and financial discipline.\n\nThis aligns with the current fundamentals health score for NBIS, which is on \"monitor\" overall with insider activity also on monitor but leadership intact.\n\nSource: Nebius Q1 2026 earnings call transcript (July 2026)",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response directly references Nebius's latest Q1 2026 earnings details on margins, guidance, and capital expenditure without generic advice or unwarranted reassurance.  \ngoal_accuracy: PASS -- The response clearly states the margin variability is a timing issue with specific margin figures and guidance, explicitly addressing concerns with concrete data from the earnings call.  \ntool_call_accuracy: PASS -- The response cites specific figures and guidance from the Q1 2026 earnings call transcript, indicating the agent used the appropriate filings and live news tools."
+        }
+      ],
+      "mean": {}
     },
     "4": {
+      "status": "scored",
       "id": 4,
-      "status": "not_scored",
-      "reason": "test_q5.py prints insider-transaction records for manual review -- no judge, no metric."
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "cases": [
+        {
+          "case": "ALAB",
+          "response": "Yes, there has been insider selling in your holding ALAB this week. Several insiders, including Stefan A. Dyckerhoff and Manuel Alba, sold shares on July 1, 2026, with the related Form 4 filings submitted in early July. Manuel Alba has also indicated an intent to sell a significant number of shares in the next 90 days. The total insider selling value in the last 30 days is $86,852,838, with two distinct sellers involved. This insider selling activity aligns with the current Fundamentals Health Score for ALAB, which is \"at risk\" mainly due to insider activity.\n\nRegarding filings, the most recent 8-K filing dated June 8, 2026, was reviewed and it primarily reports the results of the 2026 Annual Stockholders Meeting held on June 4, 2026. This filing does not disclose any insider selling or related transactions. No other recent 8-K, 10-K, or 10-Q filings reviewed contain disclosures of insider selling. Therefore, the insider selling activity is documented through Form 4 filings (insider transaction reports) rather than in 8-K or other periodic filings.\n\nNo new information from this week's insider selling changes the overall \"at risk\" status; it confirms the ongoing insider selling risk for ALAB.\n\nSources: SEC insider transaction filings (filed early July 2026), 8-K filing dated June 8, 2026, recent news on insider selling intentions.",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "real_data_checked: PASS -- The response references specific Form 4 filings and dates, indicating a check of real insider transaction data.  \naccurate_reporting: PASS -- The agent provides detailed insider selling information including names, dates, filing types, and dollar amounts without hedging.  \nscoped_correctly: PASS -- The entire response focuses solely on ALAB, the user's holding in question, with no unrelated ticker data included.",
+          "coverage": null
+        },
+        {
+          "case": "AAPL",
+          "response": "There has been no insider selling in your holdings of AAPL in the last 30 days, including this week. The insider activity signal for AAPL is currently intact with no reported insider sales.\n\nRegarding filings, the most recent 8-K filing dated April 30, 2026, was reviewed and it did not disclose any insider selling activity. This filing focused on Apple's financial results for the second fiscal quarter ended March 28, 2026, and did not include any disclosures related to insider transactions or changes in control (Source: 8-K_2026-04-30.htm).\n\nThe market data shows AAPL's stock price at $340.08 with a 0.94% increase today and a 4.13% gain over the past week. Analyst recommendations remain positive with a majority rating the stock as Strong Buy or Buy as of July 1, 2026 (Source: get_market_data).",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "real_data_checked: PASS -- The agent referenced a specific recent 8-K filing and insider activity signals, indicating it queried actual data sources rather than answering generically.  \naccurate_reporting: PASS -- The agent clearly stated no insider selling occurred in the last 30 days including this week, providing a definitive answer without hedging.  \nscoped_correctly: PASS -- The response focused solely on AAPL, the user's holding in question, without introducing unrelated tickers or data.",
+          "coverage": null
+        },
+        {
+          "case": "MRVL",
+          "response": "Yes, there has been insider selling in your holding MRVL this week. Bharathi Sandeep sold 9,013 shares in an open market transaction on July 16, 2026. Additionally, there were multiple option exercises and tax withholding transactions by the same insider around that date. This insider selling activity aligns with the current \"monitor\" status for insider activity in the fundamentals health score for MRVL.\n\nRegarding filings, the most recent 8-K filing dated June 25, 2026, does not disclose any insider selling activity. It primarily covers the annual meeting of stockholders, election of directors, approval of executive compensation, ratification of the independent auditor, and declaration of a quarterly dividend payment (8-K_2026-06-25.htm). No insider selling disclosures were found in this filing or in the recent 10-K and 10-Q filings reviewed.\n\nThus, the insider selling observed in market data and insider transaction filings is not yet reflected in the latest 8-K or other SEC filings available as of late June 2026.\n\nAnalyst recommendation trends remain positive with no sell ratings, and the fundamentals health score flags insider activity as \"monitor\" due to this insider selling.\n\nSources:\n- Insider transactions and market data: live market data as of July 28, 2026\n- Filings: 8-K dated June 25, 2026 (8-K_2026-06-25.htm) and 10-K dated March 11, 2026 (10-K_2026-03-11.htm)",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "real_data_checked: PASS -- The agent referenced specific insider transaction data including dates, share amounts, and insider names, indicating a real data query.  \naccurate_reporting: PASS -- The response clearly states insider selling occurred, naming the insider, number of shares sold, and transaction date without hedging.  \nscoped_correctly: PASS -- The entire response focuses solely on MRVL, the user's holding in question, with no unrelated ticker data included.",
+          "coverage": null
+        },
+        {
+          "case": "NBIS",
+          "response": "Regarding filings, a Form 6-K filing dated June 16, 2026, from Nebius Group N.V. (NBIS) announced the closing of the acquisition of MagicByte, Inc. (d/b/a Eigen AI Labs) by the company. This filing does not mention any insider selling or related disclosures. The latest annual 20-F filing from April 30, 2026, contains extensive risk factor disclosures but does not report any insider selling activity either.\n\nThe insider selling information remains as previously reported from market data: John Wilson IV Boynton sold multiple blocks of shares on July 15, 2026, totaling 7,458 shares at prices ranging from $187.79 to $202.29 per share. Other insiders sold shares earlier in July, including Arkadiy Volozh (46,627 shares), Danila Shtan (16,937 shares), and Andrey Korolenko (33,871 shares) all on July 1, 2026, at $235.45 per share. This insider selling is recent and significant in volume.\n\nAnalyst recommendations and price data remain unchanged as well.\n\nIn summary, no filings explicitly disclose insider selling beyond what is captured in the insider transaction reports. The insider selling activity is real and recent, consistent with the fundamentals health score's \"monitor\" status on insider activity.\n\nSources:\n- Form 6-K dated 2026-06-16\n- 20-F dated 2026-04-30\n- Insider transactions data from market data tool (2026-07-15 and 2026-07-01)",
+          "ragas_tool_call_accuracy": 1.0,
+          "ragas_goal_accuracy": 1.0,
+          "judgment": "real_data_checked: PASS -- The agent referenced specific insider transaction data with dates, share counts, and prices, indicating a real data query.  \naccurate_reporting: PASS -- The agent clearly reported multiple insider sales with detailed information on who sold, how many shares, and when.  \nscoped_correctly: PASS -- The agent focused exclusively on NBIS insider selling and did not mention unrelated tickers or holdings.",
+          "coverage": null
+        }
+      ],
+      "mean": {
+        "ragas_tool_call_accuracy": 1.0,
+        "ragas_goal_accuracy": 1.0
+      }
     },
     "5": {
       "status": "scored",
@@ -85,27 +169,44 @@
       "cases": [
         {
           "case": "capacity, demand",
-          "faithfulness": NaN,
+          "response": "16 raw mention(s) of 'capacity', 75 raw mention(s) of 'demand'.\n\n---\n\n### Source: 10-K_2026-02-20.htm\n\n**Capacity**  \n- SUBSTANTIVE  \n  \"...Leo CXL Memory Connectivity Controllers. Our Leo products allow our customers to overcome processor memory bandwidth bottlenecks and capacity limitations, while leveraging our COSMOS software suite\u2019s built-in memory management and deep diagnostic capabilities. Leo ICs and boards enable expanding, sharing, and pooling of industry standard D...\" (1 location)  \n\n- BOILERPLATE  \n  \"...Relying on third-party manufacturing partners presents significant risks, including:\u2022failure by us, our customers, or their customers to qualify a selected supplier;11Table of Contents\u2022capacity shortages during periods of high demand;\u2022reduced control over delivery schedules and quality;\u2022shortages of materials;\u2022third parties infringing, misappropriating, or otherwise violating our intellectu...\" (1 location)  \n\n- BOILERPLATE  \n  \"...se significant delays in the production or shipment of our products until we are able to shift our manufacturing from the affected location to another location. We may not be able to obtain alternate capacity on favorable terms, if at all.In addition, our dependence on our relationship with our third-party manufacturing partners or distributors may be affected by changes in governmental policies, taxation...\" (1 location)  \n\n- BOILERPLATE  \n  \"...and may in the future choose to acquire or make investments in companies, businesses and/or assets that are complementary to our business, including for the purpose of expanding our new product design capacity, introducing new design, market, or application skills, enhancing, and expanding our existing product lines or grow the number of engineers. We cannot forecast the number, timing or size of future in...\" (1 location)  \n\n- BOILERPLATE  \n  \"...and consequently inventory write-off, which would reduce our gross margin and adversely affect our financial results. Conversely, if we underestimate customer demand or if insufficient manufacturing capacity is available, we may miss revenue opportunities, potentially lose market share and damage our customer relationships. In addition, as an increasing number of our products are being incorporated into...\" (1 location)  \n\n- BOILERPLATE  \n  \"...fect on our business, financial condition, and results of operations.We generally do not have long-term contracts with our third-party manufacturing partners that require them to supply manufacturing capacity, materials, or services, and substantially all of our purchases are on a purchase order basis. We place orders with our third-party manufacturing partners for manufacturing, assembling, and testing o...\" (1 location)  \n\n- BOILERPLATE  \n  \"...ing partners with which we may contract in the future, do not achieve satisfactory yields or quality, our reputation and customer relationships could be harmed.We depend on satisfactory manufacturing capacity, prices, and production yields, as well as timely delivery to meet customer demand and enable us to maintain gross margins. The fabrication of our products is a complex and  technically  demanding  p...\" (1 location)  \n\n- BOILERPLATE  \n  \"...e future may experience manufacturing defects and reduced manufacturing yields from time to time. If these third-party manufacturing partners were to extend lead times, limit supplies or the types of capacity we require, or increase prices due to capacity constraints or other factors, our revenue and gross margin may materially decline. Any new third-party manufacturing partners we work with may present a...\" (1 location)  \n\n- BOILERPLATE  \n  \"...nd reduced manufacturing yields from time to time. If these third-party manufacturing partners were to extend lead times, limit supplies or the types of capacity we require, or increase prices due to capacity constraints or other factors, our revenue and gross margin may materially decline. Any new third-party manufacturing partners we work with may present additional and unexpected manufacturing challeng...\" (1 location)  \n\n- BOILERPLATE  \n  \"...lving standards, and frequent new product introductions. The industry has experienced significant downturns during recent global recessions, characterized by diminished product demand, production overcapacity, and high inventory levels. During these periods, our customers may overstock our products, which would lead to inflated demand for the given period.Further, any upturn in the semiconductor industry...\" (1 location)  \n\n- BOILERPLATE  \n  \"...the given period.Further, any upturn in the semiconductor industry could result in increased competition for access to third-party manufacturing partners. We are dependent on the availability of this capacity to manufacture and assemble our products, 17Table of Contentsand our third-party manufacturing partners have not provided assurances that adequate capacity will be available to us in the future.In pe...\" (1 location)  \n\n- BOILERPLATE  \n  \"...e are dependent on the availability of this capacity to manufacture and assemble our products, 17Table of Contentsand our third-party manufacturing partners have not provided assurances that adequate capacity will be available to us in the future.In periods when broad fluctuations or changes in business conditions occur, it is difficult to assess the impact on our business. We have sought to reduce our ex...\" (1 location)  \n\n- BOILERPLATE  \n  \"...tion costs and may result in a decrease in our gross margins. For example, in the past the industry has seen shortages of packaging materials, including substrates, and also experienced silicon wafer capacity constraints. If these shortages or other shortages of raw materials are to occur in the future, it may cause delays in our ability to produce our products if we are unable to secure adequate supply....\" (1 location)  \n\n- BOILERPLATE  \n  \"...required to pay the increased price and the time we are able to pass these increases along. In addition, because we are a 27Table of Contentsfabless company, global market trends such as shortage of capacity to fulfill our fabrication needs also may increase our raw material costs and thus decrease our gross margins.Our customers rely on many different service providers and component suppliers to build t...\" (1 location)  \n\n**Demand**  \n- BOILERPLATE  \n  \"...Fabric Switches are built upon industry standard connectivity protocols such as Peripheral Component Interconnect Express (\u201cPCIe\u201d), Ethernet, and Compute Express Link (\u201cCXL\u201d) to address the growing demand for purpose-built connectivity solutions that solve critical data, network, and memory bottlenecks inherent in cloud and AI infrastructure.Industry OverviewAstera Labs is a global semiconductor compa...\" (1 location)  \n\n- BOILERPLATE  \n  \"...vity challenges driven by increasing speed requirements and system complexity. Several of these trends and challenges include the rapid global adoption of cloud computing, which has led to increasing demand for compute-intensive AI workloads that are truly optimized only when deployed at cloud scale; increasing use of AI and increasingly larger and more complex AI workloads, and the need for purpose-bui...\" (1 location)  \n\n- BOILERPLATE  \n  \"...We also rely on a small, limited number of other manufacturing partners for our modules, boards, and IC substrates.We are committed to supplying the highest quality devices to meet the most stringent demands of the world\u2019s largest hyperscalers. As a result, our supply chain is optimized for quality and for rapid high-volume increases in production.It is important that our products meet and exceed the Jo...\" (1 location)  \n\n- BOILERPLATE  \n  \"...veloping and selling new products, or penetrating new markets;\u2022A substantial portion of our revenue is driven by a limited number of our end customers, and the loss of, or a significant reduction in, demand from one or a few of our top end customers would adversely affect our operations and financial condition;\u2022If we fail to achieve design wins for our products, we may lose the opportunity for sales to...\" (1 location)  \n\n- BOILERPLATE  \n  \"...and adversely affect our operating costs;\u2022Adverse changes in the political, regulatory, and economic policies of governments in connection with trade with China and Chinese customers have reduced the demand for our products and damaged our business;\u2022Our business would be adversely affected by the departure of existing members of our senior management team;\u2022Cybersecurity risks, including cyber-attacks, c...\" (1 location)  \n\n- BOILERPLATE  \n  \"...ild upon, existing product revenue streams. If we are not able to repeatedly introduce, in successive years, new products or new generations of existing products that ship in volume and meet customer demands, our revenue will likely not grow and may decline significantly and rapidly.To compete successfully, we must design, develop, market, and sell new products or new generations of existing products th...\" (1 location)  \n\n- BOILERPLATE  \n  \"...nce would be harmed as our competitors more effectively help our customers scale into these developing sectors.We believe the success of new products depends on accurate forecasts of long-term market demand and future technological developments, as well as on a variety of specific implementation factors, including: \u2022timely and efficient completion of our design and transfer to manufacturing, assembly, a...\" (1 location)  \n\n- BOILERPLATE  \n  \"...sses;\u2022the quality, performance, and reliability of our products; and\u2022effective marketing, sales, and service.If we fail to introduce new products or new generations of existing products that meet the demand of our customers or penetrate new markets that we have targeted, our revenue will likely decrease over time and our financial condition could suffer.A substantial portion of our revenue is driven by...\" (1 location)  \n\n- BOILERPLATE  \n  \"...ly decrease over time and our financial condition could suffer.A substantial portion of our revenue is driven by a limited number of our end customers, and the loss of, or a significant reduction in, demand from one or a few of our top end customers would adversely affect our operations and financial condition.A substantial portion of our revenue is driven by a limited number of end customers. In 2025,...\" (1 location)  \n\n- BOILERPLATE  \n  \"...with information in their purchase orders about which end customer will receive the products purchased. This data allows us to estimate the portion of our revenue that is due to specific end customer demand. We anticipate that we will continue to be dependent on a limited number of end customers for a significant portion of our revenue in the future, and in some cases, the portion of our revenue attribu...\" (1 location)  \n\n- BOILERPLATE  \n  \"...ers for a variety of reasons, including the following:\u2022our master agreements with our end customers generally do not require them to purchase a minimum quantity of our products and our end customers\u2019 demand for our products may be volatile;\u2022some of our end customers may redesign their systems to use fewer or none of our products with limited notice to us; and\u2022many of our end customers have pre-existing...\" (1 location)  \n\n- BOILERPLATE  \n  \"...of an existing product without any assurance that our customers will select our product for use in their systems. Additionally, we are often required to anticipate which product designs will generate demand in advance of our customers expressly indicating a need for that particular design. Even if our customers select our products, a substantial period of time will elapse before we generate revenue rela...\" (1 location)  \n\n- BOILERPLATE  \n  \"...may not generate material revenue for us, and we have needed in the past, and may need in the future, to write off excess and obsolete inventory if we have produced a product in excess of forecasted demand that does not materialize. If we incur significant expenses and investments in inventory in the future that we are not able to recover, and we are not able to compensate for those expenses, our opera...\" (1 location)  \n\n- BOILERPLATE  \n  \"...and incur additional costs and expenses. Customers could also choose at any time to stop using our products, or could fail to successfully market and sell their products, either of which could reduce demand for our products.Once a customer designs a product into its systems, the same product or enhanced versions of that product from the same supplier is likely to be used across a number of similar and s...\" (1 location)  \n\n- BOILERPLATE  \n  \"...e a material adverse effect on our business, financial condition, and results of operations.As part of our growth strategy, we seek to attract and acquire customers focused on AI. We foresee emerging demand from companies that are dedicated to providing infrastructure for AI use cases, AI-dedicated data centers, and larger enterprises, as they begin to build systems to meet their unique requirements. Ho...\" (1 location)  \n\n- BOILERPLATE  \n  \"...ys in developing new products or new generations of existing products to adapt to the changing AI landscape, and may not achieve a return on investment or capitalize on the opportunities presented by demand for AI solutions. Moreover, while AI-adoption is likely to continue and may accelerate, the long-term trajectory of this technological trend is uncertain.Additionally, we expect to see increasing gov...\" (1 location)  \n\n- BOILERPLATE  \n  \"...stomers may also become subject to such existing or upcoming AI laws and regulations, which could cause a delay or impediment to the commercialization of AI technology and could lead to a decrease in demand for our customers\u2019 AI systems, and may adversely affect our business, financial condition, and results of operations. In addition, uncertainty regarding the direction of AI regulation may affect cust...\" (1 location)  \n\n- BOILERPLATE  \n  \"...facturing partners presents significant risks, including:\u2022failure by us, our customers, or their customers to qualify a selected supplier;11Table of Contents\u2022capacity shortages during periods of high demand;\u2022reduced control over delivery schedules and quality;\u2022shortages of materials;\u2022third parties infringing, misappropriating, or otherwise violating our intellectual property rights;\u2022impairment  of  the...\" (1 location)  \n\n- BOILERPLATE  \n  \"...anced products and technologies, if we focus on technologies that do not become widely adopted, or if new competitive technologies or industry standards that we do not support become widely accepted, demand for our products may be reduced. Increased investments in research and development or unsuccessful research and development efforts could cause our cost structure to fall out of alignment with demand...\" (1 location)  \n\n---\n\n### Source: 10-Q_2026-05-06.htm\n\n**Demand**  \n- BOILERPLATE (appears verbatim in 2 locations: 10-Q_2026-05-06.htm, 10-K_2026-02-20.htm)  \n  \"...o, statements relating to our business plans, strategies, market or investment opportunities, platform, products and services, including future investments therein and anticipated benefits therefrom; demand; our future financial or operating performance and growth (such as revenue, gross profit and margins, expenses, income (losses) and other operating results); our future cash flows, expenditures, requ...\"  \n\n- SUBSTANTIVE  \n  \"...iod to period, the revenue concentration percentages attributable to individual direct customers may fluctuate in a manner that is not necessarily representative of changes in underlying end-customer demand.7Table of ContentsThe Company had the following customers that individually comprised 10% or more of its accounts receivable, net:As of March 31, 2026December 31, 2025Customer A25 %*Customer B20 %27...\"  \n\n- BOILERPLATE (appears verbatim in 2 locations: 10-Q_2026-05-06.htm, 10-K_2026-02-20.htm)  \n  \"...Fabric Switches, are built upon industry standard connectivity protocols such as Peripheral Component Interconnect Express (\u201cPCIe\u201d), Ethernet, and Compute Express Link (\u201cCXL\u201d), to address the growing demand for purpose-built connectivity solutions that solve critical data, network, and memory bottlenecks inherent in cloud and AI infrastructure.Since our inception, we have created and commercialized firs...\"  \n\n- SUBSTANTIVE  \n  \"...llion in 2022, $115.8 million in 2023, $396.3 million in 2024, and to $852.5 million in 2025. Our revenue was $308.4 million for the three months ended March 31, 2026, driven by a sizable increase in demand for our products. 17Table of ContentsSummary of Financial Highlights Our revenue was $308.4 million for the three months ended March 31, 2026, compared to $159.4 million for the same period in 2025,...\"  \n\n- SUBSTANTIVE  \n  \"...Total revenue increased $148.9 million, or 93%, for the three months ended March 31, 2026, compared to the same period in 2025, primarily due to an increase in overall unit shipments driven by higher demand for our Scorpio, Aries, and Taurus products, as well as higher overall average selling prices resulting from an increased mix of hardware modules and Scorpio products.Cost of Revenue, Gross Profit, a...\"  \n\n---\n\n### Source: transcript_Q1_2026.txt\n\n**Capacity**  \n- SUBSTANTIVE  \n  \"...with a very large TAM that we are able to address, all because we have the platform in the form of Scorpio X switches.  Operator: We will move next to Tore Svanberg at Stifel for a quick follow\u2011up on capacity.  Tore Svanberg: Yes, just a quick follow\u2011up on capacity. Your inventory days, I think, came in at 75 days\u2014  Desmond Lynch: Hi, Tore. It is Des here. Based upon our current view of demand, we do have...\"  \n\n- SUBSTANTIVE  \n  \"...cause we have the platform in the form of Scorpio X switches.  Operator: We will move next to Tore Svanberg at Stifel for a quick follow\u2011up on capacity.  Tore Svanberg: Yes, just a quick follow\u2011up on capacity. Your inventory days, I think, came in at 75 days\u2014  Desmond Lynch: Hi, Tore. It is Des here. Based upon our current view of demand, we do have supply in place through the end of the year, and we are...\"  \n\n---\n\n## Summary Classification\n\n| Source                     | Term     | Count | Classification | Notes                                                                                   |\n|----------------------------|----------|-------|----------------|-----------------------------------------------------------------------------------------|\n| 10-K_2026-02-20.htm        | capacity | 14    | BOILERPLATE (mostly) / SUBSTANTIVE (1) | Mostly boilerplate risk language; 1 excerpt with product-specific capacity mention.     |\n| 10-K_2026-02-20.htm        | demand   | 27+   | BOILERPLATE    | All excerpts are generic risk or market discussion without specific figures or dates.   |\n| 10-Q_2026-05-06.htm        | demand   | 5     | MIXED          | 3 boilerplate excerpts; 2 substantive excerpts with customer % and revenue figures.     |\n| transcript_Q1_2026.txt     | capacity | 2     | SUBSTANTIVE   | Specific inventory days and supply through year-end mentioned in Q&A format.            |\n\n---\n\nIf you need the excerpts organized differently or further details, please let me know.",
+          "faithfulness": 0.989247311827957,
           "context_recall": 1.0,
-          "factual_correctness(mode=f1)": NaN
+          "factual_correctness(mode=f1)": 0.12
         },
         {
           "case": "customer concentration",
-          "faithfulness": 0.9,
+          "response": "2 raw mention(s) of 'customer concentration'.\n\n---\n\n**BOILERPLATE**\n\n- Excerpt (appears verbatim in 2 filing location(s): Data/ALAB/10-Q_2026-05-06.htm, Data/ALAB/10-K_2026-02-20.htm)  \n  \"...propriate budgeting and expense adjustment;\u2022our ability to anticipate and respond to new and evolving market trends or industry standards, develop and sell new products, or penetrate new markets;\u2022our customer concentration, with a limited number of end customers driving our revenue;\u2022our ability to achieve product design wins and opportunities for customer sales and investment recoupment;\u2022our ability to demonstrate the...\"",
+          "faithfulness": 1.0,
           "context_recall": 1.0,
-          "factual_correctness(mode=f1)": 0.4
+          "factual_correctness(mode=f1)": 0.46
         }
       ],
       "mean": {
-        "faithfulness": 0.9,
+        "faithfulness": 0.9946236559139785,
         "context_recall": 1.0,
-        "factual_correctness(mode=f1)": 0.4
+        "factual_correctness(mode=f1)": 0.29000000000000004
       }
     },
     "6": {
+      "status": "scored",
       "id": 6,
-      "status": "not_scored",
-      "reason": "test_q8.py --mode reaction prints an LLM analyst-reaction summary for manual review -- no judge, no metric."
+      "category": "tool_calling",
+      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "cases": [
+        {
+          "case": "MRVL",
+          "response": "After today's guidance cut for Marvell Technology (MRVL), analysts largely view the stock's decline as profit-taking within a strong overall 2026 performance rather than a fundamental breakdown. Despite the roughly 7% drop in share price, Marvell shares remain up about 106% year to date. Analysts note that capital is rotating toward AI chip leaders like Nvidia, which has had more modest gains, reflecting a narrowing AI chip trade. Upcoming capital expenditure commentary from hyperscalers like Microsoft and Meta will be important to validate the AI infrastructure trade or accelerate the rotation. While some caution exists around valuation and competitive pressures, Marvell's recent profitability turnaround and strong revenue growth keep analyst interest. Overall, the guidance cut prompted caution and some position trimming but not a broad negative reassessment.\n\nSources:\n- Yahoo Finance (2026-07-28)\n- 247wallst.com (2026-07-28)\n- Investing.com (2026-07-28)",
+          "ragas_tool_call_accuracy": 0.5,
+          "ragas_goal_accuracy": 0.0,
+          "judgment": "company_vs_analyst_distinction: PASS -- The response clearly attributes views to analysts and distinguishes them from company guidance without blending the two.  \ninstitutional_data_used: FAIL -- The response lacks specific institutional recommendation data such as buy/hold/sell counts or explicit consensus shifts.  \ncitation_quality: PASS -- All claims are attributed to dated sources from July 28, 2026.",
+          "coverage": null
+        }
+      ],
+      "mean": {
+        "ragas_tool_call_accuracy": 0.5,
+        "ragas_goal_accuracy": 0.0
+      }
     },
     "7": {
       "status": "scored",
@@ -115,26 +216,53 @@
       "cases": [
         {
           "case": "ALAB (8%)",
+          "response": "Astera Labs (ALAB) stock dropped about 7.9% today, close to your stated 8% decline. The price has also fallen significantly over the past week (-20.4%) and month (-46.1%). Insider selling has been notable recently, with multiple open market sales by insiders in early July, including Stefan A. Dyckerhoff selling 10,439 shares and Manuel Alba selling 4,853 shares at prices around $450-$468 per share. Analyst recommendations remain stable with no recent downgrades, showing a mix of 7 strong buy, 14 buy, and 9 hold ratings out of 30 analysts covering the stock.\n\nThere is no specific recent news found today that directly explains the drop in ALAB's stock price. The company's fundamentals are currently rated \"at risk\" mainly due to insider selling, although revenue growth remains intact and leadership is stable. Margins are being monitored but not yet a major concern.\n\nRegarding filings, the most recent 8-K filing dated June 8, 2026, reports the 2026 Annual Stockholders Meeting held on June 4, 2026. At this meeting, all three Class II director nominees were elected to the board, the appointment of PricewaterhouseCoopers LLP as independent auditor was ratified, and advisory votes on executive compensation were approved on an annual basis. There were no disclosures of material adverse events, leadership changes, or other developments that would explain the recent stock price drop. Other recent filings such as the 10-K dated February 20, 2026, and the 10-Q dated May 6, 2026, do not show any new material risks or issues disclosed that would impact fundamentals or investor sentiment materially.\n\nGiven the significant insider selling and the large recent price decline, your nervousness is understandable. However, without a clear negative catalyst disclosed in filings or news today, the decision to sell should consider your investment horizon and risk tolerance. The fundamentals health score suggests caution but not an immediate red flag from operational performance.\n\nSources:\n- Market data and insider transactions: Market data tool, 2026-07-28\n- News search: Live news tool, 2026-07-28\n- Filings: 8-K dated 2026-06-08, 10-K dated 2026-02-20, 10-Q dated 2026-05-06",
           "any_tool_called": true,
-          "judgment": "topic_adherence: PASS -- The response focuses strictly on Astera Labs' specific fundamentals and recent insider activity without drifting into generic advice or emotional validation.  \ngoal_accuracy: PASS -- The response cites concrete data points such as revenue growth rates, margin stability, insider selling amounts, and analyst ratings to support its assessment.  \ntool_call_accuracy: PASS -- The agent appropriately used live news and market data tools to gather up-to-date stock price, insider activity, and news information relevant to the user's question."
+          "judgment": "topic_adherence: PASS -- The response focuses on specific stock data, insider selling, analyst ratings, and filings without drifting into generic advice or unsubstantiated reassurance.  \ngoal_accuracy: PASS -- The response cites concrete data points such as insider selling volumes, analyst ratings, and recent filings with no material adverse events, clearly stating no fundamental changes explain the drop.  \ntool_call_accuracy: PASS -- The agent appropriately used market data, live news, and filings tools to gather relevant and up-to-date information for the user's question."
         },
         {
           "case": "NBIS (12%)",
+          "response": "Nebius (NBIS) actually dropped about 9.7% today, not quite 12%, but it is a significant decline. The stock has also fallen about 21.8% over the past week and 29.4% over the past month. Insider selling has been notable recently, with multiple insiders selling shares at prices well above today's level, which aligns with the current \"monitor\" status on insider activity in the fundamentals health score. Leadership remains intact, and there is insufficient recent data on revenue growth and margins.\n\nNo specific news explaining today's drop was found, and analyst recommendations remain generally positive with no sell ratings.\n\nGiven the upcoming earnings report scheduled for tomorrow, July 29, 2026, it would be prudent to wait for that report and any management commentary before deciding to sell. Selling based solely on today's price drop without new fundamental information may be premature. Monitoring the earnings release will provide better insight for your decision.",
           "any_tool_called": true,
-          "judgment": "topic_adherence: PASS -- The response focuses strictly on the company's fundamentals, insider activity, analyst ratings, and news without validating the user's fear or offering generic reassurance.  \ngoal_accuracy: PASS -- The response cites specific data points such as insider selling amounts, analyst ratings, lack of negative 8-K filings, and absence of news explaining the drop, providing concrete evidence rather than vague statements.  \ntool_call_accuracy: PASS -- The agent appropriately used live news and market data tools to check for relevant updates and current stock information before responding."
+          "judgment": "topic_adherence: PASS -- The response focuses on actual stock price changes, insider activity, analyst ratings, and upcoming earnings rather than generic advice or emotional validation.  \ngoal_accuracy: PASS -- The response cites specific data points on price drops, insider selling, analyst ratings, and the lack of news, providing concrete evidence rather than vague statements.  \ntool_call_accuracy: PASS -- The agent appropriately used market data and live news searches to inform the response about price changes and news absence."
         },
         {
           "case": "MRVL (3%)",
+          "response": "Marvell's stock actually dropped about 7.8% today, which is more than the 3% you mentioned. This decline is part of a broader selloff in optical and AI-related stocks, with peers like Corning also down significantly after earnings reports in the sector. There is no specific negative news about Marvell itself today; the drop appears driven by sector-wide pressure.\n\nFrom a fundamentals perspective, Marvell's current fundamentals health score is \"monitor,\" mainly due to recent insider selling and a CEO/CFO departure, but its revenue growth and margin remain intact and strong. Insider selling in the last 30 days totaled about $6.2 million from three distinct sellers, which is a caution signal but not necessarily a reason to sell immediately.\n\nAnalyst sentiment remains positive with no recent downgrades, and the next earnings report is scheduled for August 26, 2026, which could provide more clarity.\n\nIn summary, the stock's drop today is more due to sector weakness rather than company-specific issues. Your fundamentals health score does not currently indicate a sell signal. If you are nervous, you might consider waiting for the upcoming earnings report or further developments before deciding to sell.\n\nSources: Market data and insider transactions (2026-07-28), live news search on today's market events.",
           "any_tool_called": true,
-          "judgment": "topic_adherence: PASS -- The response focuses on Marvell's specific fundamentals, insider activity, analyst ratings, and sector news without drifting into generic advice or unsubstantiated reassurance.  \ngoal_accuracy: PASS -- The response cites concrete data points such as insider selling amounts, analyst ratings, fundamentals health scores, and recent news to explicitly state that no new fundamental deterioration has occurred.  \ntool_call_accuracy: PASS -- The agent appropriately used live market data and news searches to provide an up-to-date and relevant analysis for the user's question."
+          "judgment": "topic_adherence: PASS -- The response focuses on Marvell's actual stock movement, sector context, and fundamentals without drifting into generic advice or unsubstantiated reassurance.  \ngoal_accuracy: PASS -- The response cites specific data points such as the exact stock drop, insider selling amounts, CEO/CFO departure, and analyst sentiment to support its assessment.  \ntool_call_accuracy: PASS -- The agent appropriately used market data and live news searches to verify current stock performance and sector news relevant to the user's question."
+        },
+        {
+          "case": "PANW (6%)",
+          "response": "Regarding filings, the most recent relevant filing is an 8-K dated June 2, 2026, where Palo Alto Networks announced its financial results for the third quarter ended April 30, 2026. This filing is a routine earnings release and does not indicate any new risks, material adverse changes, or leadership changes (8-K, 2026-06-02). Additionally, the 10-Q for the nine months ended April 30, 2026, shows that operating cash flow increased by $501 million compared to the prior year period, driven by business growth, while investing cash outflows increased by $656 million due to higher payments for business acquisitions, and financing cash outflows increased by $600 million primarily due to share repurchases and contingent consideration payments (10-Q, 2026-06-03). No other recent filings suggest any fundamental deterioration.\n\nThe rest of the information remains as previously stated:\n\nPalo Alto Networks (PANW) did not drop 6% today as you mentioned; the actual price change today is a slight increase of about 0.53%, with the stock trading around $319. Over the past week, the stock has declined about 6.77%, which might be the source of your concern, but today's move itself is positive.\n\nRecent news shows some mixed activity with institutional buying and selling, but no major negative headlines today. Insider selling has occurred recently but is not unusual and is being monitored. Analyst sentiment remains generally positive with a majority rating the stock as Buy or Strong Buy.\n\nRegarding fundamentals, PANW's revenue growth remains intact and strong, but margins are currently at risk, which is a factor to watch. Leadership is stable with no recent changes.\n\nGiven this, the fundamentals do not indicate an urgent reason to sell based on today's price action or recent news. The stock's recent weekly decline may reflect broader market or sector trends rather than company-specific deterioration. If you are nervous, consider your investment horizon and risk tolerance, but there is no clear fundamental red flag today that mandates selling.",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response focuses on the actual stock price movement, recent filings, news, and fundamentals without drifting into generic advice or unsubstantiated reassurance.  \ngoal_accuracy: PASS -- The response cites specific filings, cash flow figures, stock price data, and analyst sentiment to support the conclusion that no fundamental deterioration has occurred.  \ntool_call_accuracy: PASS -- The agent appropriately used market data, live news, and filings to address the user's concern about the stock drop."
+        },
+        {
+          "case": "DELL (9%)",
+          "response": "Dell Technologies' stock dropped about 8.15% today, close to the 9% you mentioned. This decline seems to be part of broader market and tech sector volatility rather than a specific negative event related to Dell, as no major Dell-specific news was found explaining the drop.\n\nFrom a fundamentals perspective, Dell's revenue growth remains strong and intact, with significant year-over-year increases in recent quarters. However, the company's profit margins are currently at risk, showing some pressure, and insider activity is also a concern due to notable insider selling in the last 30 days. Leadership remains stable with no recent disruptive changes.\n\nGiven these mixed fundamentals\u2014strong revenue growth but margin pressure and insider selling\u2014and the lack of a clear negative catalyst specific to Dell, selling should be considered carefully based on your personal investment goals and risk tolerance. Monitoring Dell's upcoming earnings report on September 3, 2026, may provide more clarity before making a decision.\n\nIn summary, Dell's fundamentals are currently at risk mainly due to margin and insider activity concerns, but revenue growth and leadership are intact. The stock's drop today aligns with broader market trends rather than a Dell-specific crisis, so an immediate sell is not necessarily warranted but caution and close monitoring are advised.",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response focuses on Dell's actual stock movement, fundamentals, and recent insider activity without resorting to generic reassurance or emotional validation.  \ngoal_accuracy: PASS -- The response cites specific data points such as the exact stock drop percentage, revenue growth trends, margin pressure, insider selling, and the absence of Dell-specific news.  \ntool_call_accuracy: PASS -- The agent appropriately used market data and live news tools to verify the stock drop and check for any relevant news events."
         }
       ],
       "mean": {}
     },
     "8": {
+      "status": "scored",
       "id": 8,
-      "status": "not_scored",
-      "reason": "test_q8.py --mode rating_change narrates a deterministic Python delta, but nothing checks the narration against it -- no judge, no metric."
+      "category": "tool_calling",
+      "scored_by": "deterministic check_narration_matches_deltas against a real computed Finnhub trend diff (no LLM judge, no RAGAS metric)",
+      "cases": [
+        {
+          "case": "MRVL",
+          "passed": true,
+          "reason": "narration matches computed deltas",
+          "narration": "Between 2026-06-01 and 2026-07-01, analysts have slightly changed their rating on Marvell. The number of \"buy\" ratings increased by 1, from 29 to 30. All other categories\u2014\"strongBuy,\" \"hold,\" \"sell,\" and \"strongSell\"\u2014remained unchanged during this period. Overall, there was a minor shift toward more \"buy\" recommendations as of 2026-07-01."
+        }
+      ],
+      "mean": {
+        "pass_rate": 1.0
+      }
     },
     "9": {
       "status": "scored",
@@ -144,9 +272,10 @@
       "cases": [
         {
           "case": "ALAB",
+          "response": "This week for Astera Labs (ALAB), the notable points are:\n\nFilings:\n- No new 8-K filings indicating leadership changes or material governance events this week.\n- The latest quarterly 10-Q from May 6, 2026, shows strong Q1 2026 results with $308 million revenue (up 93% YoY) and non-GAAP EPS beating estimates.\n- The company continues to invest in AI infrastructure connectivity products and participates in industry consortiums like UALink 2.0.\n- No new risk disclosures or material changes in filings this week.\n\nMedia:\n- Astera Labs is expanding its Taiwan operations and Cloud-Scale Interop Lab to collaborate with AI platform providers and system manufacturers.\n- The company is recognized for accelerating AI infrastructure spending and expanding its Taurus Ethernet product line.\n- Recent media notes a stock pullback due to semiconductor sector weakness and institutional stake reductions.\n- Institutional investors like Swiss National Bank have adjusted holdings recently.\n\nAnalyst and Market Activity:\n- The stock price dropped about 20.4% over the past week and 46.1% over the past month, closing at $260.23 on July 28, 2026.\n- Insider selling is significant with over $86 million sold in the last 30 days by two insiders, contributing to fundamentals being \"at risk.\"\n- Analyst coverage remains positive with 7 Strong Buy, 14 Buy, and 9 Hold ratings, no Sell ratings.\n- Next earnings report is due August 4, 2026.\n\nIn summary, Astera Labs shows strong revenue growth and stable leadership, but insider selling and recent stock price decline pose risks. The company is actively expanding product lines and industry collaborations, supporting a positive operational outlook despite market pressures.\n\nThis aligns with the current fundamentals health score of \"at risk\" due to insider activity and margin monitoring.\n\nSources: SEC filings (10-Q May 6, 2026; 8-K June 8, 2026), news articles July 22-28, 2026, and market data as of July 28, 2026.",
           "ragas_tool_call_accuracy": 0.6666666666666666,
           "ragas_goal_accuracy": 1.0,
-          "judgment": "source_coverage: PASS -- The response explicitly addresses filings, media (noting no major news), and analyst activity with relevant details or a clear statement of no notable findings.  \ncitation_quality: PASS -- Each claim is attributed to specific filings with dates, market data with dates, and analyst coverage as of a given date, providing clear source references.  \ntool_call_accuracy: PASS -- The agent used filings data (8-K, 10-Q, 10-K), media search (noting no news), and market data including insider transactions and analyst ratings, matching the tools called.",
+          "judgment": "source_coverage: PASS -- The response explicitly addresses filings, media, and analyst/market activity with findings or notes of no new filings.  \ncitation_quality: FAIL -- While some filings and dates are mentioned, media and analyst claims lack specific source citations or URLs, and institutional data is vaguely referenced without precise attribution.  \ntool_call_accuracy: PASS -- The agent used filings data, news articles, and market data consistent with the tools called.",
           "coverage": {
             "filings": true,
             "media": true,
@@ -159,68 +288,31 @@
         "ragas_goal_accuracy": 1.0
       }
     },
-    "11": {
+    "10": {
       "status": "scored",
-      "id": 11,
+      "id": 10,
       "category": "tool_calling",
-      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
-      "cases": [
-        {
-          "case": "MRVL",
-          "ragas_tool_call_accuracy": 1.0,
-          "ragas_goal_accuracy": 1.0,
-          "judgment": "goal_accuracy: PASS -- The response specifies the leadership departure event and quantifies insider selling, directly addressing the flagged sub-signals with concrete details.  \ntopic_adherence: PASS -- The answer focuses on Marvell\u2019s actual Fundamentals Health Score data and flagged signals rather than generic commentary.  \nno_overclaiming: PASS -- The response correctly treats intact signals as stable and does not invent any unsupported numbers or concerns.",
-          "coverage": {
-            "earnings_date_cited": true,
-            "all_flagged_signals_named": true,
-            "missing_signals": []
-          }
-        },
-        {
-          "case": "NBIS",
-          "ragas_tool_call_accuracy": 1.0,
-          "ragas_goal_accuracy": 1.0,
-          "judgment": "goal_accuracy: PASS -- The response specifies the insider activity amount ($24,413,164 sold by 4 insiders) driving the flagged sub-signal rather than just naming it.  \ntopic_adherence: PASS -- The response focuses on the actual Fundamentals Health Score data and specific flagged signals for Nebius without generic filler.  \nno_overclaiming: PASS -- The response correctly identifies intact leadership as not a concern and does not invent any unsupported numbers or issues.",
-          "coverage": {
-            "earnings_date_cited": true,
-            "all_flagged_signals_named": true,
-            "missing_signals": []
-          }
-        }
-      ],
-      "mean": {
-        "ragas_tool_call_accuracy": 1.0,
-        "ragas_goal_accuracy": 1.0
-      }
-    },
-    "12": {
-      "id": 12,
-      "status": "not_built",
-      "reason": "not built"
-    },
-    "13": {
-      "status": "scored",
-      "id": 13,
-      "category": "hybrid",
-      "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
+      "scored_by": "custom PASS/FAIL judge only (no RAGAS metric wired in for this question yet)",
       "cases": [
         {
           "case": "ALAB",
-          "ragas_tool_call_accuracy": 1.0,
-          "ragas_goal_accuracy": 1.0,
-          "judgment": "rollup_accuracy: PASS -- The response correctly identifies the overall status as \"at risk,\" matching the worst sub-signal (insider activity) without downplaying or exaggerating.  \nsignal_completeness: PASS -- The response addresses all four sub-signals individually: revenue growth, margin, insider activity, and leadership.  \nhonest_framing: FAIL -- The response frames the data as a current snapshot only and does not attempt to assess changes since purchase, but the user question explicitly asked about deterioration \"since I bought it,\" which the response fails to address or clarify as unsupported.",
-          "coverage": {
-            "all_signals_addressed": true,
-            "missing_signals": [],
-            "overall_status_reflected": true,
-            "real_overall": "at_risk"
-          }
+          "response": "Astera Labs has experienced a moderation in its year-over-year revenue growth rate over several quarters, but the latest quarter indicates that growth is stabilizing rather than signaling a bigger slowdown. For the quarter ended March 31, 2026, revenue was $308.4 million, representing a 14% sequential increase and a 93% year-over-year increase. This strong absolute growth was broad-based across product lines, including signal conditioning and fabric switch portfolios, with PCIe Gen 6 solutions contributing over one-third of total revenue.\n\nManagement's guidance for Q2 2026 projects revenue between $355 million and $365 million, a 15% to 18% sequential increase, driven by continued strength in AI fabric and signal conditioning products. The company highlighted accelerating AI infrastructure spending and expanding product adoption, including ramping shipments of the new Scorpio X Series 320-lane fabric switch and growth in Aries and Torus product lines.\n\nWhile the year-over-year growth rate percentage has declined from prior very high levels (e.g., 149.7% YoY in 2025-06 quarter to 93.4% in 2026-03 quarter), the strong sequential growth, positive product momentum, and confident guidance indicate revenue growth is stabilizing at a high level rather than signaling a larger slowdown.\n\nThis assessment aligns with the Fundamentals Health Score for ALAB, which shows revenue growth as intact.\n\nSources:\n- Astera Labs Q1 2026 earnings call transcript (2026-07)\n- Astera Labs Q1 2026 10-Q filing (2026-05-06)\n- Astera Labs 2025 10-K filing (2026-02-20)",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response provides specific revenue figures and growth rates for multiple quarters rather than accepting the premise without verification.  \ngoal_accuracy: PASS -- The response clearly states that while year-over-year growth rates have declined from very high levels, revenue growth is stabilizing rather than continuing to slow, supported by exact growth percentages.  \ntool_call_accuracy: PASS -- The response references specific filings and earnings call transcripts, indicating the agent used the tools to check real financial data."
+        },
+        {
+          "case": "AAPL",
+          "response": "Apple's latest quarter (Q2 fiscal 2026) shows a strong rebound in revenue growth, suggesting stabilization rather than a continued slowdown. The company reported $111.2 billion in revenue, up 17% year over year, which is a March record and above the high end of guidance despite supply constraints. iPhone revenue grew 22% year over year, services revenue grew 16%, and Mac revenue increased 6% despite supply constraints. Growth was broad-based across geographic segments, including strong double-digit growth in Greater China, the rest of Asia Pacific, and emerging markets like India.\n\nManagement highlighted the strong customer enthusiasm for the iPhone 17 family, which is the most popular lineup in Apple's history through the launch period, and noted market share gains according to IDC. The advanced Mac lineup and new MacBook Neo also saw strong demand and market share gains.\n\nThis strong performance aligns with the current Fundamentals Health Score for Apple, which shows intact revenue growth with recent quarters exhibiting year-over-year growth rates of 9.6%, 7.9%, 15.7%, and 16.6%. There is no indication from the latest quarter that a bigger slowdown is coming.\n\nSource: Apple Q2 2026 earnings call transcript and 10-Q filing (period ended March 28, 2026).",
+          "any_tool_called": true,
+          "judgment": "topic_adherence: PASS -- The response directly addresses Apple's revenue growth figures with specific quarterly growth rates, rather than accepting the question's premise uncritically.  \ngoal_accuracy: PASS -- The response clearly corrects the premise by showing that revenue growth is stabilizing and improving, supported by detailed growth percentages.  \ntool_call_accuracy: PASS -- The response cites specific data from the latest earnings call and 10-Q filing, indicating the agent used the search_filings tool to verify actual financial data."
         }
       ],
-      "mean": {
-        "ragas_tool_call_accuracy": 1.0,
-        "ragas_goal_accuracy": 1.0
-      }
+      "mean": {}
+    },
+    "11": {
+      "id": 11,
+      "status": "not_built",
+      "reason": "not built"
     }
   }
 }

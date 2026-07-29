@@ -227,8 +227,21 @@ export function Dashboard({
       setLoading(true);
       setError(null);
       try {
-        const [results] = await Promise.all([
-          Promise.all(tickers.map((t) => fetchDashboard(t))),
+        const [settledResults] = await Promise.all([
+          // allSettled, not all (fixed 2026-07-28, UI-audit bug-list item
+          // "Dashboard Promise.all no per-ticker catch"): with Promise.all,
+          // ONE ticker's fetchDashboard rejecting (a transient backend
+          // hiccup, one Finnhub call timing out, etc.) rejected the whole
+          // array, which threw into the catch block below and put the
+          // ENTIRE dashboard into the generic error state -- hiding the
+          // other tickers that fetched successfully. allSettled lets each
+          // ticker fail independently; only the tickers that resolve get
+          // rendered (the `if (!data[t]) return null` guard in the grid
+          // below, and the `selected &&` guard on the detail panel, both
+          // already handled a ticker being absent from `data` gracefully
+          // -- this fix only had to change how `data` gets populated, not
+          // how it's rendered).
+          Promise.allSettled(tickers.map((t) => fetchDashboard(t))),
           // Real holdings, same call the Portfolio page makes -- both
           // pages now share one backend source of truth instead of each
           // holding its own local copy of mock-holdings.ts. Fetched
@@ -246,10 +259,30 @@ export function Dashboard({
         ]);
         if (cancelled) return;
         const byTicker: Record<string, DashboardData> = {};
-        results.forEach((d) => {
-          byTicker[d.ticker] = d;
+        const failedTickers: string[] = [];
+        settledResults.forEach((result, i) => {
+          if (result.status === "fulfilled") {
+            byTicker[result.value.ticker] = result.value;
+          } else {
+            failedTickers.push(tickers[i]);
+          }
         });
+        if (failedTickers.length > 0) {
+          // eslint-disable-next-line no-console -- deliberate: surfaces a
+          // per-ticker failure in the browser console without blocking the
+          // tickers that did load, same "degrade gracefully, don't hide
+          // the failure" reasoning as the rest of this fix.
+          console.error(`Dashboard: failed to load data for ${failedTickers.join(", ")}`);
+        }
         setData(byTicker);
+        // Only fall back to the full-page error when EVERY ticker failed
+        // (a real "backend is down" case) -- not when some tickers loaded
+        // fine and one didn't, which is now a partial-data case handled by
+        // simply omitting that ticker's card, not by hiding everything
+        // that DID load.
+        if (tickers.length > 0 && Object.keys(byTicker).length === 0) {
+          setError("Couldn't load dashboard data -- is the backend running?");
+        }
       } catch {
         if (!cancelled) setError("Couldn't load dashboard data -- is the backend running?");
       } finally {

@@ -32,7 +32,11 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Portfolio Copilot",
+  // Fixed 2026-07-28 (UI-audit bug-list item "branding drift in the tab
+  // title") -- was still "Portfolio Copilot," the pre-rename product name;
+  // every other user-facing surface (dashboard.tsx's header copy, this
+  // session's own work) already calls it North.
+  title: "North",
   description: "Agentic RAG assistant grounding your holdings in filings, fundamentals, and live data",
 };
 

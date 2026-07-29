@@ -59,7 +59,6 @@ from ragas.dataset_schema import SingleTurnSample
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import FactualCorrectness, Faithfulness, LLMContextRecall
 
-from parent_child_retriever import build_parent_child_retriever
 from test_q1 import load_ticker_documents
 from test_q7 import count_raw_hits_by_keyword, dedupe_hits, find_hits, format_grouped_hits, format_single_hit, SUMMARY_PROMPT
 
@@ -95,22 +94,36 @@ def load_dataset() -> dict:
 # retired retriever after app/tools.py's search_filings moved to the new
 # parent-child + Cohere rerank one. Without this, Q1's RAGAS scores would
 # measure a retriever the live agent no longer uses.
-_retriever_cache: dict[str, object] = {}
-
-
+#
+# CHANGED 2026-07-28 (Maiu, real bug found in a live run_scorecard.py
+# run): this used to maintain its own separate, process-lifetime
+# _retriever_cache dict here, calling build_parent_child_retriever
+# directly with cache_key=ticker -- a SECOND on-disk Qdrant cache,
+# independent of app/tools.py's own _RETRIEVER_CACHE (used by the live
+# agent's search_filings tool), even though both point at the exact same
+# on-disk directory per ticker (parent_child_retriever.EMBEDDING_CACHE_DIR
+# / ticker). Qdrant's local (path=) mode takes an exclusive file lock on
+# that directory -- fine across two separate PROCESSES (falls back to an
+# in-memory rebuild, by design, see parent_child_retriever.py's own
+# comment), but this was two independent caches racing for the same lock
+# WITHIN one process: run_scorecard.py runs Q1's RAG scoring first
+# (populating this cache, never released), then any live-agent question
+# (Q3/Q7/Q9/Q10) calls search_filings -> app.tools.get_retriever, which
+# tried to open the SAME ticker's directory again and lost the race --
+# confirmed via a real run's own printed warnings for every ticker
+# touched after Q1 ("already accessed by another instance of Qdrant
+# client... falling back to an in-memory build... will re-embed via
+# OpenAI"), a real, avoidable extra OpenAI cost every time. Fixed by
+# delegating to app.tools.get_retriever directly -- one retriever, one
+# open Qdrant client, per ticker, per process, shared by RAG scoring and
+# the live agent both. app.tools.get_retriever has its own bounded LRU
+# cache (_RETRIEVER_CACHE, app/tools.py), so this still only builds each
+# ticker's retriever once per process, same guarantee the old
+# _retriever_cache gave, just via a single shared cache instead of two.
 def _get_cached_retriever(ticker: str):
-    if ticker not in _retriever_cache:
-        documents = load_ticker_documents(ticker)
-        # cache_key=ticker (2026-07-26): persists embeddings to local disk
-        # (parent_child_retriever.EMBEDDING_CACHE_DIR) so a SECOND run of
-        # this script (or app/tools.py's live agent, which now uses the
-        # same cache_key) doesn't re-embed via OpenAI at all if nothing
-        # about this ticker's corpus/chunking changed since the last run.
-        # This process-local _retriever_cache above still matters too --
-        # it's what avoids re-hitting even the disk cache twice per
-        # process (Q1 has 2 test cases per ticker).
-        _retriever_cache[ticker] = build_parent_child_retriever(documents, cache_key=ticker)
-    return _retriever_cache[ticker]
+    from app.tools import get_retriever
+
+    return get_retriever(ticker)
 
 
 # ---------------------------------------------------------------------------
@@ -124,22 +137,23 @@ Q1_DRIVER_PROMPT = ChatPromptTemplate.from_messages(
             "human",
             "You are a portfolio-monitoring assistant. Using ONLY the context "
             "below (pulled from {ticker}'s SEC filings and latest earnings "
-            "call transcript), answer: what did {ticker}'s management "
-            "specifically identify as the driver behind {metric}?\n\n"
-            "Lead with the exact figure(s) management cited -- percentage, basis "
-            "points, or dollar amount, exactly as stated in the source -- in your "
-            "first sentence, then explain the driver in one additional sentence "
-            "at most. If the context discusses multiple periods, use ONLY the one "
-            "that matches {metric} exactly -- do not blend or substitute a "
-            "different period's figures. Clearly state whether this is a "
-            "backward-looking result (something that already happened) or "
-            "forward-looking guidance (something they're projecting). If the "
-            "context doesn't address this, say so explicitly rather than "
+            "call transcript), answer: how does {ticker}'s {metric} guidance "
+            "for next quarter compare to what they just reported?\n\n"
+            "Lead with the exact figure management cited for the MOST RECENTLY "
+            "REPORTED quarter -- percentage, basis points, or dollar amount, "
+            "exactly as stated in the source -- then state the exact guidance "
+            "figure(s) for next quarter, then explain in one sentence whether "
+            "guidance represents an improvement, a step down, or roughly flat "
+            "versus the reported result, and why (the driver management cited "
+            "for that trajectory). Do not blend or substitute a different "
+            "period's figures. If the context only addresses one of the two "
+            "periods, say explicitly which one is missing rather than "
             "guessing.\n\n"
             "CONTEXT:\n{context}\n\n"
             "Respond in this exact format, with no extra commentary:\n"
-            "Driver: [one sentence, leading with the exact figure(s), then the cited reason]\n"
-            "Type: [Backward-looking result / Forward-looking guidance / Not addressed]\n"
+            "This quarter: [exact figure(s) actually reported]\n"
+            "Next quarter guidance: [exact figure(s) guided]\n"
+            "Comparison: [one sentence: better / worse / flat, and the driver cited for the guidance]\n"
             "Source: [1-2 short quotes -- whichever sentence(s) actually support the answer]",
         )
     ]
@@ -147,11 +161,14 @@ Q1_DRIVER_PROMPT = ChatPromptTemplate.from_messages(
 
 
 def run_rag_q1(case: dict) -> dict:
-    """Q1: driver-identification (margin/guidance). Vector retrieval.
-    Replaces the retired thesis-comparison version -- thesis is no longer
-    a product concept, so this no longer uses test_q1.py's original
-    Verdict/Evidence/Explanation prompt, only its generic load/retrieve
-    utilities."""
+    """Q1: comparison question (this quarter's actual vs. next quarter's
+    guidance, same metric). Vector retrieval. Rewritten 2026-07-28 (Maiu,
+    explicit call) from a single backward-OR-forward driver-identification
+    question into a backward-AND-forward comparison -- see eval_dataset.json
+    id 1's reuses field for the full rationale. Replaces the retired
+    thesis-comparison version -- thesis is no longer a product concept, so
+    this doesn't use test_q1.py's original Verdict/Evidence/Explanation
+    prompt, only its generic load/retrieve utilities."""
     retriever = _get_cached_retriever(case["ticker"])
     # "...prefer the exact verbatim sentence..." (2026-07-26): confirmed
     # necessary against a real case (PANW's Q4 revenue/margin outlook) --
@@ -162,17 +179,26 @@ def run_rag_q1(case: dict) -> dict:
     # DELL's (RRF fixes that one, see parent_child_retriever.py) -- this
     # one is Cohere ranking a paraphrased restatement over the actual
     # verbatim management quote, addressed here by giving the reranker an
-    # explicit signal to prefer, not by widening top_n (which would just
-    # let more context through without fixing why the ranking is wrong --
-    # and reopens the over-stuffed-context risk MAX_PARENT_CHARS was
-    # built to prevent, see parent_child_retriever.py).
+    # explicit signal to prefer, not by widening top_n.
+    #
+    # Query and k both widened 2026-07-28 for the comparison rewrite: the
+    # old query scoped retrieval to ONLY "the most recently reported
+    # quarter, not the full fiscal year," which was correct for the old
+    # single-period question but would actively work against this one --
+    # the new question needs BOTH the reported-quarter figure AND the
+    # guidance figure to come back, not just one. k raised 5 -> 6 to give
+    # the second period's passage a real chance to make the cut alongside
+    # the first, a modest increase weighed against MAX_PARENT_CHARS's own
+    # over-stuffed-context concern (parent_child_retriever.py), not an
+    # unbounded widening.
     query = (
-        f"What did {case['ticker']}'s management identify as the specific driver behind {case['metric']}, "
-        f"for the most recently reported quarter, not the full fiscal year? Prefer the exact verbatim "
-        f"sentence from management's spoken remarks over any bullet-point summary, headline takeaway, "
-        f"or restated figure elsewhere in the source."
+        f"How does {case['ticker']}'s {case['metric']} guidance for next quarter compare to what they "
+        f"just reported? Retrieve both: the actual {case['metric']} figure from the most recently "
+        f"reported quarter, and any forward guidance for {case['metric']} in the next quarter. Prefer "
+        f"the exact verbatim sentence from management's spoken remarks over any bullet-point summary, "
+        f"headline takeaway, or restated figure elsewhere in the source."
     )
-    retrieved_docs = retriever(query, k=5)
+    retrieved_docs = retriever(query, k=6)
     contexts = [d.page_content for d in retrieved_docs]
 
     chain = Q1_DRIVER_PROMPT | answer_llm | StrOutputParser()

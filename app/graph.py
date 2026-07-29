@@ -143,6 +143,17 @@ evidence supports.
 Always cite your source (document name, or news URL + date) for any claim. If a tool returns no \
 relevant results, say so explicitly rather than guessing.
 
+This applies even when combining findings from multiple tools into one answer -- synthesizing into \
+a single cohesive narrative means organizing and connecting claims clearly, not stripping each \
+individual claim's own source and date to make the prose flow. A combined answer with five cited \
+claims is correct; a combined answer with one clean paragraph and no per-claim citations has failed \
+this requirement, even if it reads well.
+
+When reporting a specific transaction, share count, or figure a tool actually returned, state that \
+exact number -- never soften it into a vague quantifier ("multiple", "a significant amount", \
+"several blocks") when the real number is sitting in the tool output. If a specific figure is \
+genuinely absent from the data, say so plainly rather than describing it in vague terms.
+
 Never state that something wasn't found, filed, disclosed, or reported unless you actually \
 called the tool that would have found it -- not calling a tool is not the same as checking and \
 finding nothing. If a question spans multiple categories (e.g. filings, media/news, and \
@@ -556,7 +567,13 @@ def _filings_guard_correction(tool_result: str) -> str:
         "that as a checked result, not an assumption. Keep every other section -- market data, "
         "news, insider activity, analyst recommendations -- EXACTLY as you already reported it "
         "in your prior answer, with the same level of detail and the same source attributions. "
-        "Do not summarize, shorten, or drop specificity from any section you are not correcting."
+        "Do not summarize, shorten, or drop specificity from any section you are not correcting. "
+        "Exception: this preservation instruction does not excuse a vague quantifier or a missing "
+        "citation in an untouched section -- if your prior answer described a figure vaguely "
+        "('multiple', 'a significant amount') when the underlying tool output actually had the "
+        "exact number, or cited a claim without its source and date, fix that in place even though "
+        "you are not otherwise revising that section. Preserving content means keeping the same "
+        "facts and claims, not preserving an avoidable imprecision."
     )
 
 
@@ -588,7 +605,12 @@ def _customer_guard_correction(tool_result: str) -> str:
         "if this shows a real end-customer concentration figure, state it plainly and cite it; "
         "if it shows nothing relevant, state that as a checked result, not an assumption. Keep "
         "every other section exactly as you already reported it, with the same detail and "
-        "source attributions."
+        "source attributions. Exception: this preservation instruction does not excuse a vague "
+        "quantifier or a missing citation in an untouched section -- if your prior answer "
+        "described a figure vaguely ('multiple', 'a significant amount') when the underlying tool "
+        "output actually had the exact number, or cited a claim without its source and date, fix "
+        "that in place even though you are not otherwise revising that section. Preserving content "
+        "means keeping the same facts and claims, not preserving an avoidable imprecision."
     )
 
 
@@ -645,17 +667,48 @@ def ask(graph, ticker: str, question: str, thread_id: str = "default", verbose: 
         # Call the real tool ourselves -- don't just ask the model to try
         # again, since that's the exact thing a prompt-only fix already
         # failed to reliably produce (Q9's original bug).
+        #
+        # Wrapped in try/except 2026-07-28 (Maiu, bug-list item: "Guards
+        # bypass ToolNode error handling"). guard.tool_fn.invoke() below
+        # calls the underlying @tool function DIRECTLY, outside
+        # create_react_agent's own ToolNode -- LangGraph's prebuilt
+        # ToolNode catches a tool's exceptions and turns them into a
+        # ToolMessage the model can react to, but a raw .invoke() here has
+        # none of that: a live Finnhub/Qdrant/network failure inside a
+        # guard's forced call previously propagated straight out of ask(),
+        # and server.py's /chat handler only catches FileNotFoundError
+        # (deliberately, for an unmapped ticker) -- everything else became
+        # an unhandled 500, on every future turn in a thread where Q2/Q3
+        # guards fire, not a one-off. Real risk, not theoretical: Q2 and Q3
+        # both depend on guards firing regularly (confirmed via this
+        # session's own stability runs).
+        #
+        # Fix: if the forced tool call or the correction turn itself fails,
+        # skip THIS guard and degrade to the pre-guard draft answer rather
+        # than crashing the whole turn -- an uncorrected-but-real answer is
+        # a strictly better failure mode than a 500 with no answer at all.
+        # Other guards still get their turn (not a `break`) since a later
+        # guard's forced call may succeed even if this one didn't.
         forced_args = guard.build_args(ticker)
-        tool_result = guard.tool_fn.invoke(forced_args)
-        correction = guard.build_correction(tool_result)
-        result = graph.invoke(
-            {
-                "messages": [("human", correction)],
-                "ticker": ticker,
-                "health_score_text": str(health_score),
-            },
-            config=config,
-        )
+        try:
+            tool_result = guard.tool_fn.invoke(forced_args)
+            correction = guard.build_correction(tool_result)
+            result = graph.invoke(
+                {
+                    "messages": [("human", correction)],
+                    "ticker": ticker,
+                    "health_score_text": str(health_score),
+                },
+                config=config,
+            )
+        except Exception as e:
+            print(
+                f"!! [{guard.name} guard] forced tool call/correction failed, "
+                f"skipping this guard and keeping the pre-guard draft answer: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            continue
         tools_used = get_tools_used(result["messages"])
         tool_calls = get_tool_calls(result["messages"])
         if guard.tool_fn.name not in tools_used:

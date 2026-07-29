@@ -125,7 +125,7 @@ Every tool here was chosen for free-tier pricing and fast iteration during testi
 
 **Infrastructure Diagram:**
 
-![Infrastructure Diagram: Next.js UI on Render calls a FastAPI/LangGraph backend with an in-memory checkpointer. The backend routes model calls through Portkey to GPT-4.1 mini and calls four tools directly (Qdrant, keyword search, Tavily, Finnhub, SEC EDGAR). LangSmith observes the backend via traces.](assets/infrastructure_diagram.svg)
+![Infrastructure Diagram: Next.js UI on Render calls a FastAPI/LangGraph backend with a Postgres-backed checkpointer (PostgresSaver in production; MemorySaver only as a local-dev fallback when DATABASE_URL is unset). The backend routes model calls through Portkey to GPT-4.1 mini and calls six data/tool sources directly (Qdrant, keyword search, Tavily, Finnhub, SEC EDGAR, and Postgres itself for price_snapshots/holdings). A planned, schema-only persistent-memory tier in the same Postgres instance (health_score_history, user_memory with a memory_type column, news_dedup) is shown as not-yet-wired -- the intended home for episodic/procedural/semantic memory. LangSmith observes the backend via traces.](assets/infrastructure_diagram.svg)
 
 ### 3. Agent Workflow
 

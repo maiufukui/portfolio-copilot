@@ -51,7 +51,18 @@ load_dotenv()
 # reachable, same hard-requirement status as the LLM/search/market-data
 # keys below -- a missing DATABASE_URL should fail loudly at startup,
 # not silently degrade every price-history answer in production.
-REQUIRED_ENV_VARS = ["OPENAI_API_KEY", "TAVILY_API_KEY", "FINNHUB_API_KEY", "DATABASE_URL"]
+#
+# COHERE_API_KEY added 2026-07-28 (Maiu, explicit call, overriding an
+# earlier soft-warning draft of this fix): search_filings's rerank step
+# (parent_child_retriever.py's _rerank) silently falls back to a local
+# BM25 rerank if Cohere is unavailable -- real retrieved passages either
+# way (BM25 doesn't fabricate content, it just ranks the same candidate
+# set differently), but a worse-selected top-k directly undermines this
+# product's core promise of grounding answers in the actual filing.
+# Quality is the top priority here, so this key gets the same
+# hard-requirement treatment as OPENAI_API_KEY rather than a silent,
+# self-healing degradation nobody would notice without watching logs.
+REQUIRED_ENV_VARS = ["OPENAI_API_KEY", "TAVILY_API_KEY", "FINNHUB_API_KEY", "DATABASE_URL", "COHERE_API_KEY"]
 
 
 def _check_env() -> None:

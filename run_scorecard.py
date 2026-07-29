@@ -34,21 +34,48 @@ no PASS/FAIL, nothing to aggregate:
 
 This is a DELIBERATELY additive wrapper, not a rewrite: every score
 here comes from calling the existing, already-verified functions in
-run_eval.py / test_q7_grounding.py / test_q9.py / test_q11.py
-directly (same pattern compare_retrievers.py already uses
-for run_eval.py's Q1 runner) -- none of their internal scoring logic
-was touched or reimplemented, so nothing that was already confirmed
-working via a real run this session (Q9/Q11's RAGAS scores) is at
-risk of regressing here. Building a NEW judge/metric for the four
-not-yet-scored questions above is a materially bigger, riskier task
-this file deliberately does not attempt -- flagged as a real gap, not
-solved by this consolidation.
+run_eval.py / test_q3.py / test_q5.py / test_q7_grounding.py /
+test_q8.py / test_q9.py / test_q10.py directly (same pattern
+compare_retrievers.py already uses for run_eval.py's Q1 runner) --
+none of their internal scoring logic was touched or reimplemented, so
+nothing that was already confirmed working via a real run this session
+(Q9's RAGAS scores) is at risk of regressing here.
 
-Cannot be executed from this dev sandbox (no `ragas` installed, no
-network to install it, and several of the underlying scripts need live
-OPENAI_API_KEY/FINNHUB_API_KEY/TAVILY_API_KEY/PORTKEY_API_KEY calls) --
-only `py_compile` syntax-checked. Needs a real run to confirm it
-actually produces the scorecard as designed.
+UPDATED 2026-07-28 (Maiu, explicit call: "build and automate all 10"):
+Q2 (test_q2.py), Q3 (new, test_q3.py), Q4 (test_q5.py), Q6 (test_q8.py),
+and Q8 (test_q8.py) all now have real scorers wired in below -- closing
+the gap this module's docstring previously flagged. Q11 (old id 12, the
+whole-portfolio digest) is explicitly NOT tested (see eval_dataset.json
+id 11's own reuses field) -- it stays status="not_built" and is skipped
+by build_scorecard()'s own not-built branch, same as before. The old
+id-11 question (earnings date + Fundamentals Health Score, previously
+scored via test_q11.py) was DROPPED from the dataset entirely when Q10
+replaced it -- test_q11.py itself still exists in this repo but is no
+longer dispatched to by anything here, since no dataset question maps
+to it anymore. Flagged as an orphaned script, not deleted without an
+explicit go-ahead.
+
+  Scored, aggregated here (10 of 11 total questions):
+    Q1  (rag)          -- RAGAS triad, run_eval.py's run_rag_q1
+    Q2  (tool_calling)  -- custom judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference, test_q2.py's run_case
+    Q3  (tool_calling)  -- custom PASS/FAIL judge only, test_q3.py's run_case
+    Q4  (tool_calling)  -- custom judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference, test_q5.py's run_case
+    Q5  (rag)           -- same RAGAS triad, run_eval.py's run_rag_q5
+    Q6  (tool_calling)  -- custom judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference, test_q8.py's run_case
+    Q7  (tool_calling)  -- custom PASS/FAIL judge only, test_q7_grounding.py's run_case
+    Q8  (tool_calling)  -- deterministic check_narration_matches_deltas against a real computed diff, test_q8.py's run_case (Q8-specific, single-arg)
+    Q9  (tool_calling)  -- custom judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference, test_q9.py's run_case
+    Q10 (tool_calling)  -- custom PASS/FAIL judge only, test_q10.py's run_case
+
+  NOT scored (disclosed, not silently dropped):
+    Q11 -- status="not_built" in eval_dataset.json, explicitly not tested (no product support for portfolio-wide queries)
+
+Cannot be executed from this dev sandbox (no live OPENAI_API_KEY/
+FINNHUB_API_KEY/TAVILY_API_KEY/PORTKEY_API_KEY/DATABASE_URL calls
+attempted -- see each test_qN.py's own module docstring for what was
+and wasn't verified) -- only `py_compile` and import-chain checked.
+Needs a real run to confirm it actually produces the scorecard as
+designed end to end.
 
 Usage:
     python run_scorecard.py                  # run every scored question, write eval_scorecard.json
@@ -76,12 +103,11 @@ load_dotenv()
 
 DEFAULT_OUT_PATH = "eval_scorecard.json"
 
-NOT_SCORED = {
-    2: "test_q2.py prints an LLM relevance list (High/Medium/Low) for manual review -- no judge, no metric.",
-    4: "test_q5.py prints insider-transaction records for manual review -- no judge, no metric.",
-    6: "test_q8.py --mode reaction prints an LLM analyst-reaction summary for manual review -- no judge, no metric.",
-    8: "test_q8.py --mode rating_change narrates a deterministic Python delta, but nothing checks the narration against it -- no judge, no metric.",
-}
+# Empty as of 2026-07-28 -- Q2/Q4/Q6/Q8 all have real scorers wired in
+# below now (see module docstring for what changed and why). Kept as a
+# named dict, not deleted, so a future not-yet-scored question has an
+# obvious place to be disclosed rather than silently dropped.
+NOT_SCORED: dict[int, str] = {}
 
 evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4.1-mini", temperature=0))
 
@@ -93,7 +119,7 @@ def _score_rag_question(question: dict) -> dict:
     qid = question["id"]
     runner = RAG_RUNNERS[qid]
 
-    samples, labels, has_ref_flags = [], [], []
+    samples, labels, responses, has_ref_flags = [], [], [], []
     for case in question["test_cases"]:
         result = runner(case)
         reference = case.get("reference")
@@ -108,6 +134,7 @@ def _score_rag_question(question: dict) -> dict:
             )
         )
         labels.append(label)
+        responses.append(result["response"])
         has_ref_flags.append(has_reference)
 
     metrics = [Faithfulness(llm=evaluator_llm)]
@@ -119,10 +146,15 @@ def _score_rag_question(question: dict) -> dict:
     df = scores.to_pandas()
     metric_cols = [c for c in df.columns if c not in ("user_input", "retrieved_contexts", "response", "reference")]
 
+    # "response" added 2026-07-28 (Maiu, explicit call): the full generated
+    # answer text used to only exist in stdout, not in eval_scorecard.json --
+    # real gap, surfaced while diagnosing Q1's factual_correctness score,
+    # where seeing the actual answer text (not just the numeric metric) is
+    # what real diagnosis needs.
     cases = []
     for i, label in enumerate(labels):
         row = df.iloc[i]
-        cases.append({"case": label, **{c: float(row[c]) for c in metric_cols if c in row}})
+        cases.append({"case": label, "response": responses[i], **{c: float(row[c]) for c in metric_cols if c in row}})
 
     means = {c: float(df[c].mean()) for c in metric_cols if c in df.columns}
 
@@ -135,8 +167,8 @@ def _score_rag_question(question: dict) -> dict:
     }
 
 
-def _score_tool_question_9_11(question: dict) -> dict:
-    """Q9/Q11 share the same shape: a build_graph() + run_case(graph,
+def _score_tool_question_2_4_6_9(question: dict) -> dict:
+    """Q2/Q4/Q6/Q9 share the same shape: a build_graph() + run_case(graph,
     case, judge_llm) that already returns judgment text + real
     ragas_tool_call_accuracy + ragas_goal_accuracy (the latter scored
     against each module's own outcome-voiced GOAL_REFERENCE, not
@@ -144,29 +176,48 @@ def _score_tool_question_9_11(question: dict) -> dict:
     GOAL_REFERENCE comment for why that swap was necessary). Imported
     directly from each question's own module -- not reimplemented.
 
-    Previously also handled Q13 (test_q13.py) -- removed 2026-07-27
-    along with that question and its script; see module docstring."""
+    Renamed 2026-07-28 from _score_tool_question_9_11 (Q11 dropped this
+    shape -- old id-11 was removed from the dataset entirely when Q10
+    replaced it, see eval_dataset.json id 10's reuses field and this
+    module's docstring; test_q11.py still exists but nothing here
+    dispatches to it anymore). Q2/Q4/Q6 added the same day, same reason
+    ("build and automate all 10") -- each module's load_qN() already
+    returns cases in the {"ticker", "company", ...} shape this loop
+    expects (test_q5.py's load_q4() normalizes Q4's portfolio-wide
+    dataset entry into per-ticker cases at load time -- see its own
+    docstring for why)."""
     qid = question["id"]
     from app.graph import build_graph
 
-    if qid == 9:
+    if qid == 2:
+        from test_q2 import load_q2, run_case
+        q = load_q2()
+        cases = q["test_cases"]
+    elif qid == 4:
+        from test_q5 import load_q4, run_case
+        q = load_q4()
+        cases = q["test_cases"]
+    elif qid == 6:
+        from test_q8 import load_q6, run_case
+        q = load_q6()
+        cases = q["test_cases"]
+    elif qid == 9:
         from test_q9 import load_q9, run_case
         q = load_q9()
-    elif qid == 11:
-        from test_q11 import load_q11, run_case
-        q = load_q11()
+        cases = q["test_cases"]
     else:
         raise ValueError(qid)
 
     graph = build_graph()
     judge_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
-    cases = []
-    for case in q["test_cases"]:
+    results = []
+    for case in cases:
         r = run_case(graph, case, judge_llm)
-        cases.append(
+        results.append(
             {
                 "case": r["ticker"],
+                "response": r.get("response"),
                 "ragas_tool_call_accuracy": r.get("ragas_tool_call_accuracy"),
                 "ragas_goal_accuracy": r.get("ragas_goal_accuracy"),
                 "judgment": r.get("judgment"),
@@ -174,8 +225,8 @@ def _score_tool_question_9_11(question: dict) -> dict:
             }
         )
 
-    tca_vals = [c["ragas_tool_call_accuracy"] for c in cases if c["ragas_tool_call_accuracy"] is not None]
-    ga_vals = [c["ragas_goal_accuracy"] for c in cases if c["ragas_goal_accuracy"] is not None]
+    tca_vals = [c["ragas_tool_call_accuracy"] for c in results if c["ragas_tool_call_accuracy"] is not None]
+    ga_vals = [c["ragas_goal_accuracy"] for c in results if c["ragas_goal_accuracy"] is not None]
     mean = {}
     if tca_vals:
         mean["ragas_tool_call_accuracy"] = sum(tca_vals) / len(tca_vals)
@@ -186,47 +237,112 @@ def _score_tool_question_9_11(question: dict) -> dict:
         "id": qid,
         "category": question["category"],
         "scored_by": "custom PASS/FAIL judge + real RAGAS ToolCallAccuracy + AgentGoalAccuracyWithReference",
-        "cases": cases,
+        "cases": results,
         "mean": mean,
     }
 
 
-def _score_q7(question: dict) -> dict:
-    """Q7 only has the custom PASS/FAIL judge (no RAGAS metric wired in
-    yet) -- reported as judgment text per case, not a numeric mean,
-    since nothing here parses the judge's PASS/FAIL text into a score."""
+def _score_grounding_question(question: dict) -> dict:
+    """Q3/Q7/Q10 share the same shape: a build_graph() + run_case(graph,
+    case, judge_llm) from a "GROUNDING_JUDGE_PROMPT"-style module (does
+    the response actually check real data instead of mirroring the
+    question's own framing) -- custom PASS/FAIL judge only, no RAGAS
+    metric wired in for any of these three yet, reported as judgment
+    text per case rather than a numeric mean.
+
+    Generalized 2026-07-28 from the original Q7-only _score_q7 (Maiu,
+    "build and automate all 10") -- test_q3.py and test_q10.py were
+    both built directly off test_q7_grounding.py's template, so they
+    share its run_case(graph, case, judge_llm) -> {"ticker",
+    "any_tool_called", "judgment", ...} return shape exactly."""
+    qid = question["id"]
     from app.graph import build_graph
-    from test_q7_grounding import load_q7_cases, run_case
+
+    if qid == 3:
+        from test_q3 import load_q3_cases, run_case
+        cases = load_q3_cases()
+    elif qid == 7:
+        from test_q7_grounding import load_q7_cases, run_case
+        cases = load_q7_cases()
+    elif qid == 10:
+        from test_q10 import load_q10_cases, run_case
+        cases = load_q10_cases()
+    else:
+        raise ValueError(qid)
 
     graph = build_graph()
     judge_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
-    cases = []
-    for case in load_q7_cases():
+    results = []
+    for case in cases:
         r = run_case(graph, case, judge_llm)
-        cases.append(
+        label = r["ticker"] if "move_pct" not in r else f"{r['ticker']} ({r['move_pct']}%)"
+        results.append(
             {
-                "case": f"{r['ticker']} ({r['move_pct']}%)",
+                "case": label,
+                "response": r.get("response"),
                 "any_tool_called": r["any_tool_called"],
                 "judgment": r["judgment"],
             }
         )
 
     return {
-        "id": 7,
+        "id": qid,
         "category": question["category"],
         "scored_by": "custom PASS/FAIL judge only (no RAGAS metric wired in for this question yet)",
-        "cases": cases,
+        "cases": results,
         "mean": {},
+    }
+
+
+def _score_q8(question: dict) -> dict:
+    """Q8 is a genuinely different shape from every other tool_calling
+    question here: no LangGraph agent involved at all (test_q8.py's own
+    Q8 run_case docstring explains why -- it's direct Finnhub + a
+    deterministic Python diff + narration, not a tool-calling question in
+    the live-agent sense), so it needs no graph/judge_llm, and it's
+    scored by a deterministic pass/fail against real computed deltas
+    (check_narration_matches_deltas), not an LLM judge or a RAGAS metric.
+    Added 2026-07-28 (Maiu, "build and automate all 10") -- previously
+    listed in NOT_SCORED."""
+    from test_q8 import load_q8, run_rating_change_case
+
+    q = load_q8()
+    results = []
+    for case in q["test_cases"]:
+        r = run_rating_change_case(case)
+        results.append(
+            {
+                "case": r["ticker"],
+                "passed": r["passed"],
+                "reason": r["reason"],
+                "narration": r.get("narration"),
+            }
+        )
+
+    scored = [r for r in results if r["passed"] is not None]
+    mean = {"pass_rate": sum(1 for r in scored if r["passed"]) / len(scored)} if scored else {}
+
+    return {
+        "id": 8,
+        "category": question["category"],
+        "scored_by": "deterministic check_narration_matches_deltas against a real computed Finnhub trend diff (no LLM judge, no RAGAS metric)",
+        "cases": results,
+        "mean": mean,
     }
 
 
 SCORERS = {
     1: _score_rag_question,
+    2: _score_tool_question_2_4_6_9,
+    3: _score_grounding_question,
+    4: _score_tool_question_2_4_6_9,
     5: _score_rag_question,
-    7: _score_q7,
-    9: _score_tool_question_9_11,
-    11: _score_tool_question_9_11,
+    6: _score_tool_question_2_4_6_9,
+    7: _score_grounding_question,
+    8: _score_q8,
+    9: _score_tool_question_2_4_6_9,
+    10: _score_grounding_question,
 }
 
 
@@ -291,6 +407,26 @@ def main():
 
     question_ids = [args.question] if args.question else None
     scorecard = build_scorecard(question_ids)
+
+    # Merge into any existing scorecard file rather than overwriting it
+    # wholesale -- real bug, found 2026-07-28 via a real two-command
+    # sequence (--question 1, then --question 8): the old code below did
+    # a plain open(args.out, "w") every time, truncating the file and
+    # writing ONLY the question(s) just requested -- the second command
+    # silently discarded Q1's results that were sitting in the file from
+    # the first. --question exists specifically for narrow, single-
+    # question re-runs (this project's own standing convention -- see
+    # CLAUDE.md's "default to narrowest scope" rule), so the file it
+    # writes needs to behave like a durable, accumulating scorecard, not
+    # get reset by every partial run. Only merges when --question was
+    # actually used and a prior file exists -- a full run (no --question)
+    # still does a clean full overwrite, which is correct for that case.
+    if question_ids is not None and os.path.exists(args.out):
+        with open(args.out) as f:
+            existing = json.load(f)
+        existing.setdefault("questions", {}).update(scorecard["questions"])
+        existing["generated_at"] = scorecard["generated_at"]
+        scorecard = existing
 
     with open(args.out, "w") as f:
         json.dump(scorecard, f, indent=2, default=str)
