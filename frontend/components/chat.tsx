@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Bot,
+  Compass,
   FileText,
   Globe,
   Loader2,
@@ -111,14 +111,19 @@ export function Chat({ ticker, threadId }: { ticker: string; threadId: string })
                   cuts text off rather than wrapping it once the column is
                   narrow (this chat panel is ~32% width, not the full
                   page) -- overridden here with whitespace-normal + h-auto
-                  so multi-line suggestion text actually displays in full. */}
+                  so multi-line suggestion text actually displays in full.
+                  size="sm"'s own px/py/text-size are all overridden too
+                  (2026-07-29, Maiu: "looks squished") -- sm was built for
+                  single-line, icon-sized buttons, not multi-line wrapped
+                  text, and had almost no vertical breathing room once
+                  h-auto let the text wrap to 2-3 lines. */}
               {SUGGESTIONS.map((s) => (
                 <Button
                   key={s}
                   variant="outline"
                   size="sm"
                   onClick={() => send(s)}
-                  className="h-auto w-full justify-start text-left whitespace-normal"
+                  className="h-auto w-full justify-start rounded-xl px-3.5 py-2.5 text-left text-sm leading-snug whitespace-normal"
                 >
                   {s}
                 </Button>
@@ -186,8 +191,12 @@ function MessageRow({ message }: { message: ChatMessage }) {
       )}
     >
       <Avatar>
-        <AvatarFallback>
-          {isHuman ? <User className="size-4" /> : <Bot className="size-4" />}
+        {/* AI avatar uses the same mark as the sidebar logo (Compass,
+            bg-primary/text-primary-foreground) instead of a generic robot
+            icon (2026-07-29, Maiu) -- makes the assistant read as "North"
+            specifically, not an unbranded chatbot. */}
+        <AvatarFallback className={cn(!isHuman && "bg-primary text-primary-foreground")}>
+          {isHuman ? <User className="size-4" /> : <Compass className="size-4" />}
         </AvatarFallback>
       </Avatar>
 
@@ -222,8 +231,8 @@ function ThinkingRow() {
   return (
     <div className="flex w-full items-start gap-3">
       <Avatar>
-        <AvatarFallback>
-          <Bot className="size-4" />
+        <AvatarFallback className="bg-primary text-primary-foreground">
+          <Compass className="size-4" />
         </AvatarFallback>
       </Avatar>
       <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">

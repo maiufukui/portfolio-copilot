@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { Chat } from "@/components/chat";
+import { ChatPanel } from "@/components/chat-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,6 +70,7 @@ export default function PortfolioPage() {
 
   const [editingTicker, setEditingTicker] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [chatCollapsed, setChatCollapsed] = useState(true);
 
   const [adding, setAdding] = useState(false);
   const [addDraft, setAddDraft] = useState<AddDraft | null>(null);
@@ -219,6 +220,10 @@ export default function PortfolioPage() {
 
   return (
     <AppShell>
+      {/* Same inline-toggle / expanded-side-column split as app/page.tsx
+          (2026-07-29, Maiu: collapsed "Ask North" sits inline next to
+          whatever's already in this page's header row -- here, Add
+          Holding -- not a full-width bar or a side column). */}
       <div className="flex h-full min-h-0 flex-col lg:flex-row">
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           <div className="mb-4 flex items-start justify-between gap-4">
@@ -226,18 +231,28 @@ export default function PortfolioPage() {
               <h1 className="font-heading text-2xl font-semibold">Portfolio</h1>
               <p className="mt-1 text-sm text-muted-foreground">Manage your holdings</p>
             </div>
-            <Button
-              title={
-                tickersAvailableToAdd.length === 0
-                  ? "All supported tickers are already in your portfolio"
-                  : undefined
-              }
-              disabled={adding || tickersAvailableToAdd.length === 0}
-              onClick={startAdd}
-            >
-              <Plus className="size-4" />
-              Add Holding
-            </Button>
+            <div className="flex items-start gap-3">
+              {chatCollapsed && (
+                <ChatPanel
+                  ticker={chatTicker}
+                  threadId={chatTicker}
+                  collapsed
+                  onToggle={setChatCollapsed}
+                />
+              )}
+              <Button
+                title={
+                  tickersAvailableToAdd.length === 0
+                    ? "All supported tickers are already in your portfolio"
+                    : undefined
+                }
+                disabled={adding || tickersAvailableToAdd.length === 0}
+                onClick={startAdd}
+              >
+                <Plus className="size-4" />
+                Add Holding
+              </Button>
+            </div>
           </div>
 
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">Loading holdings...</p>}
@@ -462,17 +477,14 @@ export default function PortfolioPage() {
           )}
         </div>
 
-        <div className="flex h-[45vh] min-h-[320px] flex-col border-t lg:h-auto lg:w-[28%] lg:min-w-[340px] lg:border-t-0 lg:border-l">
-          <div className="border-b bg-background px-4 py-3">
-            <p className="font-heading text-base font-semibold">Ask North</p>
-            <p className="text-xs text-muted-foreground">
-              Grounded in filings, earnings, news, and market data.
-            </p>
-          </div>
-          <div className="min-h-0 flex-1">
-            <Chat key={chatTicker} ticker={chatTicker} threadId={chatTicker} />
-          </div>
-        </div>
+        {!chatCollapsed && (
+          <ChatPanel
+            ticker={chatTicker}
+            threadId={chatTicker}
+            collapsed={false}
+            onToggle={setChatCollapsed}
+          />
+        )}
       </div>
     </AppShell>
   );

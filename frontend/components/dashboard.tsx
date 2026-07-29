@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, MoreHorizontal } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthPill } from "@/components/health-pill";
@@ -119,17 +119,10 @@ function PortfolioValue({
 
   return (
     <div className="w-full sm:w-72">
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="mb-1">
         <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           Portfolio Value
         </p>
-        <button
-          type="button"
-          aria-label="Portfolio value options"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <MoreHorizontal className="size-4" />
-        </button>
       </div>
       {hasAnyQuote ? (
         <>
@@ -210,10 +203,17 @@ export function Dashboard({
   tickers,
   selectedTicker,
   onSelectTicker,
+  chatToggle,
 }: {
   tickers: string[];
   selectedTicker: string;
   onSelectTicker: (ticker: string) => void;
+  // Collapsed "Ask North" button, rendered inline next to Portfolio Value
+  // (2026-07-29, Maiu: "keep it to the right, right next to the portfolio
+  // value" -- not a full-width bar, not a side column, an inline button
+  // in this specific header row). Optional/null when chat is expanded --
+  // the page itself renders the expanded panel as a separate side column.
+  chatToggle?: React.ReactNode;
 }) {
   const [data, setData] = useState<Record<string, DashboardData>>({});
   const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
@@ -334,7 +334,10 @@ export function Dashboard({
             {flaggedCount === 1 ? "change" : "changes"} that may need your attention.
           </p>
         </div>
-        <PortfolioValue data={data} holdings={holdings} />
+        <div className="flex items-start gap-3">
+          <PortfolioValue data={data} holdings={holdings} />
+          {chatToggle}
+        </div>
       </div>
 
       <div>
