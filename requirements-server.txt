@@ -12,6 +12,14 @@ langchain-openai==0.3.28
 langchain-qdrant==0.2.0
 langchain-text-splitters==0.3.9
 langgraph==0.6.4
+# app/graph.py imports PostgresSaver unconditionally at module load time
+# (from langgraph.checkpoint.postgres import PostgresSaver), so this is a
+# hard runtime dependency of the deployed server, not an optional extra --
+# missing it here is a real, confirmed deploy failure (2026-07-28,
+# ModuleNotFoundError: No module named 'langgraph.checkpoint.postgres' at
+# server startup), not a hypothetical. Pin matches requirements.txt exactly
+# -- see that file's own comment for why 2.0.25, not latest.
+langgraph-checkpoint-postgres==2.0.25
 qdrant-client==1.15.0
 tiktoken==0.9.0
 beautifulsoup4==4.13.4
