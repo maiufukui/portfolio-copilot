@@ -36,7 +36,7 @@ import re
 import sys
 import time
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 from dotenv import load_dotenv
@@ -86,6 +86,8 @@ from shared_helpers import (  # noqa: E402
     search_tavily,
     within_window,
 )
+
+from llm_gateway import build_chat_llm  # noqa: E402
 
 from app import db  # noqa: E402
 
@@ -683,7 +685,43 @@ def _compute_fundamentals_health_score(ticker: str) -> dict:
     real_statuses = [s.get("status") for s in signals.values() if s.get("status") in order]
     overall = max(real_statuses, key=lambda s: order[s]) if real_statuses else "insufficient_data"
 
-    return {"ticker": ticker, "overall": overall, "signals": signals}
+    # Wiring the previously-unused health_score_history table (2026-07-29,
+    # for the portfolio summary feature) -- write today's snapshot and
+    # read back the most recent one from before today, so callers can
+    # tell whether this ticker's status just changed. Both wrapped
+    # defensively, same "a DB hiccup must not break the main response"
+    # pattern already used for price_snapshots in get_market_data -- this
+    # runs on every real (uncached) health score computation, not on
+    # every request, since get_fundamentals_health_score only calls this
+    # function on a cache miss.
+    overall_yesterday = None
+    # Real date of that snapshot, not assumed to be literally "yesterday"
+    # (2026-07-29, Maiu caught this): the write only happens opportunis-
+    # tically, whenever the health score is freshly computed, so the most
+    # recent snapshot before today could be from any prior day, not
+    # necessarily the last calendar day. Surfacing the real date lets
+    # generate_portfolio_summary say what actually happened ("since your
+    # last recorded check on July 28") instead of a wrong "yesterday".
+    overall_as_of = None
+    try:
+        db.save_health_score_snapshot(ticker, overall, signals)
+    except Exception as e:  # noqa: BLE001
+        print(f"_compute_fundamentals_health_score: snapshot write failed for {ticker!r}: {e!r}", file=sys.stderr)
+    try:
+        prior = db.get_health_score_asof(ticker, date.today())
+        if prior:
+            overall_yesterday = prior["overall"]
+            overall_as_of = prior["computed_at"]
+    except Exception as e:  # noqa: BLE001
+        print(f"_compute_fundamentals_health_score: snapshot read failed for {ticker!r}: {e!r}", file=sys.stderr)
+
+    return {
+        "ticker": ticker,
+        "overall": overall,
+        "overall_yesterday": overall_yesterday,
+        "overall_as_of": overall_as_of,
+        "signals": signals,
+    }
 
 
 # -----------------------------------------------------------------
@@ -826,3 +864,146 @@ def get_dashboard_data(ticker: str) -> dict:
         "next_earnings_date": next_earnings_date,
         "news": news,
     }
+
+
+# Cached by calendar date, not a numeric TTL like the caches above -- a
+# "vs. yesterday" comparison is only meaningful once a day, so the date
+# string itself is the natural cache key (self-expiring at midnight,
+# nothing to compute). Grows by one entry per day for the life of the
+# process; never pruned, same "nothing in this app ever deletes cached
+# history" stance as price_snapshots -- trivial memory footprint at this
+# scale (one small string per day).
+_PORTFOLIO_SUMMARY_CACHE: dict[str, str | None] = {}
+
+
+def generate_portfolio_summary(holdings: list[dict]) -> str | None:
+    """1-2 sentence AI-generated summary of how the portfolio has moved
+    since yesterday, for the dashboard header (2026-07-29 -- replaces a
+    static "North analyzed your portfolio and found N changes" line that
+    was neither AI-generated nor an actual comparison to anything; see
+    chat history 2026-07-29).
+
+    Every fact the model sees is computed deterministically in Python
+    first: portfolio % change since yesterday's close, the single
+    biggest mover by |change_pct|, and any ticker whose overall health
+    status differs from get_health_score_asof's "yesterday" read (via
+    get_fundamentals_health_score's overall_yesterday field). The
+    model's only job is to turn those facts into 1-2 plain sentences --
+    it is explicitly told not to invent or recompute anything. Recent
+    news for whichever ticker gets highlighted is folded in as color,
+    reusing get_dashboard_news (no new API calls -- same cached lookup
+    the Supporting Evidence panel already uses).
+
+    Returns None -- not a placeholder string -- on any failure: no
+    holdings, no usable quote data, or the LLM call itself failing.
+    That last one was a real, disclosed risk (Portkey's
+    'inline_provider_blocked' failure -- see llm_gateway.py's own
+    docstring for the original incident), now fixed and confirmed live
+    2026-07-31 via a real run of test_q9.py against the actual account,
+    from inside the live agent with bound tools, the same shape of call
+    this one makes. Callers should still render their own honest
+    fallback text when this returns None -- the LLM call can still fail
+    for ordinary reasons (rate limit, timeout) even with the Portkey
+    issue resolved -- just not assume that specific failure mode is
+    still live.
+    """
+    cache_key = date.today().isoformat()
+    if cache_key in _PORTFOLIO_SUMMARY_CACHE:
+        return _PORTFOLIO_SUMMARY_CACHE[cache_key]
+
+    summary: str | None = None
+    try:
+        api_key = os.environ.get("FINNHUB_API_KEY")
+        if api_key and holdings:
+            movers: list[tuple[str, float]] = []
+            status_changes: list[tuple[str, str, str, str]] = []
+            total_value = 0.0
+            total_prev_value = 0.0
+
+            for h in holdings:
+                ticker = h["ticker"].upper()
+                shares = h["shares"]
+                quote = fetch_quote(ticker, api_key)
+                if not quote or quote.get("price") is None or quote.get("prev_close") is None:
+                    continue
+                total_value += shares * quote["price"]
+                total_prev_value += shares * quote["prev_close"]
+                if quote.get("change_pct") is not None:
+                    movers.append((ticker, quote["change_pct"]))
+
+                health = get_fundamentals_health_score(ticker)
+                overall = health.get("overall")
+                overall_yesterday = health.get("overall_yesterday")
+                if overall_yesterday and overall != overall_yesterday:
+                    # Real calendar date of the prior snapshot, NOT assumed
+                    # to be "yesterday" (2026-07-29, Maiu caught this): the
+                    # snapshot write only happens opportunistically when
+                    # the health score is freshly computed, so the last
+                    # known prior status could be from several days back
+                    # if the app wasn't opened in between. Told to the
+                    # model explicitly so it can say what actually
+                    # happened instead of a wrong "yesterday".
+                    as_of_raw = health.get("overall_as_of")
+                    as_of_date = as_of_raw[:10] if as_of_raw else "an earlier check"
+                    status_changes.append((ticker, overall_yesterday, overall, as_of_date))
+
+            if total_prev_value > 0:
+                portfolio_pct = (total_value - total_prev_value) / total_prev_value * 100
+                biggest_mover = max(movers, key=lambda m: abs(m[1])) if movers else None
+
+                # A real status change is more worth surfacing than a
+                # plain price move -- "your status changed" is the thing
+                # actually worth an alert, not just who moved most today.
+                highlight_ticker = (
+                    status_changes[0][0] if status_changes else (biggest_mover[0] if biggest_mover else None)
+                )
+                headlines: list[str] = []
+                if highlight_ticker:
+                    headlines = [n["title"] for n in get_dashboard_news(highlight_ticker)[:2] if n.get("title")]
+
+                # "Since yesterday's close" is only true of the PRICE
+                # figure -- prev_close is a real Finnhub end-of-day value,
+                # accurate regardless of when this runs. It is NOT true of
+                # a status change, which compares against whenever the
+                # last snapshot happens to be (see status_changes above) --
+                # kept as two separate, differently-worded facts on
+                # purpose so the model can't blur one's precision into the
+                # other.
+                facts = [f"Portfolio value change since yesterday's close: {portfolio_pct:+.2f}%"]
+                if biggest_mover:
+                    facts.append(f"Biggest single-ticker mover today: {biggest_mover[0]} ({biggest_mover[1]:+.2f}%)")
+                if status_changes:
+                    for t, before, after, as_of in status_changes:
+                        facts.append(
+                            f"Status change: {t} moved from {before} to {after} "
+                            f"(last recorded status before this was checked on {as_of})"
+                        )
+                else:
+                    facts.append("No ticker's health status has changed since it was last checked.")
+                if headlines:
+                    facts.append(f"Recent headlines for {highlight_ticker}: " + "; ".join(headlines))
+
+                prompt = (
+                    "You are writing a 1-2 sentence summary for a portfolio dashboard. "
+                    "Use ONLY the facts listed below -- do not invent, estimate, or "
+                    "recompute any number, and do not mention any ticker or fact not "
+                    "listed here. Lead with the overall portfolio % change, then "
+                    "highlight the single most important driver (a status change if "
+                    "one occurred, otherwise the biggest mover), briefly explaining why "
+                    "if a headline supports it. IMPORTANT: only say 'since yesterday's "
+                    "close' for the portfolio % figure -- that one is precise. For a "
+                    "status change, reference the specific date given in the fact (e.g. "
+                    "'since it was last checked on <date>'), never say 'yesterday' for "
+                    "it, since that date may be more than one day ago. Plain, direct "
+                    "tone, no hedging, no exclamation points.\n\n" + "\n".join(facts)
+                )
+
+                llm = build_chat_llm(model="gpt-4.1-mini", temperature=0.3)
+                response = llm.invoke(prompt)
+                summary = (getattr(response, "content", "") or "").strip() or None
+    except Exception as e:  # noqa: BLE001 -- a nice-to-have enrichment, never worth breaking the dashboard
+        print(f"generate_portfolio_summary: failed: {e!r}", file=sys.stderr)
+        summary = None
+
+    _PORTFOLIO_SUMMARY_CACHE[cache_key] = summary
+    return summary

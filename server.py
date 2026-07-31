@@ -42,7 +42,7 @@ from pydantic import BaseModel
 
 from app import db
 from app.graph import ask, build_graph
-from app.tools import TICKER_TO_COMPANY, get_dashboard_data
+from app.tools import TICKER_TO_COMPANY, generate_portfolio_summary, get_dashboard_data
 
 load_dotenv()
 
@@ -157,6 +157,21 @@ def list_holdings() -> dict:
     page reload anyway"), fixed by this being a real shared backend.
     """
     return {"holdings": db.list_holdings()}
+
+
+@app.get("/portfolio-summary")
+def portfolio_summary() -> dict:
+    """1-2 sentence AI-generated summary of portfolio movement since
+    yesterday's close, for the dashboard header (2026-07-29, replaces a
+    static line that wasn't actually AI-generated or a real comparison
+    to anything -- see app/tools.py's generate_portfolio_summary
+    docstring for the full design). `summary` is null, not an error,
+    when there isn't enough data yet (no holdings, first day with no
+    health-score history, or the underlying LLM call failed) -- the
+    frontend renders its own honest fallback text in that case rather
+    than treating null as a 500.
+    """
+    return {"summary": generate_portfolio_summary(db.list_holdings())}
 
 
 @app.post("/holdings", status_code=201)

@@ -52,6 +52,7 @@ There is no delete/prune function anywhere in this file.
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import date as date_type
 from datetime import datetime
@@ -254,6 +255,53 @@ def get_price_history(ticker: str, limit: int = 90) -> list[dict]:
     with engine.connect() as conn:
         rows = conn.execute(stmt).fetchall()
     return [{"date": r.date.isoformat(), "close": r.close} for r in rows]
+
+
+def save_health_score_snapshot(ticker: str, overall: str, signals: dict) -> None:
+    """Insert one snapshot of a computed health score into
+    health_score_history (2026-07-29 -- wiring the previously schema-only
+    table for the portfolio summary feature; see the module docstring's
+    Five tables note). Plain insert, not an upsert like
+    save_price_snapshot: computed_at is a timestamp (not a date), so
+    multiple snapshots on the same calendar day are expected and fine --
+    get_health_score_asof below reads by calendar date, not row count,
+    so a few extra same-day rows per ticker don't change what a caller
+    sees. Wrapped defensively by the caller (app/tools.py), same as
+    save_price_snapshot -- a DB hiccup here must not break the health
+    score response itself.
+    """
+    ticker = ticker.upper()
+    engine = get_engine()
+    stmt = health_score_history.insert().values(
+        ticker=ticker, overall=overall, signals_json=json.dumps(signals)
+    )
+    with engine.begin() as conn:
+        conn.execute(stmt)
+
+
+def get_health_score_asof(ticker: str, before_date: date_type) -> dict | None:
+    """Most recent health score snapshot strictly before `before_date`
+    (a calendar date, not a timestamp) -- passing today's date returns
+    yesterday-or-earlier's last known status, which is exactly what the
+    portfolio summary needs for a "did this change since yesterday"
+    comparison. Returns None if no snapshot exists yet before that date
+    -- expected on day one, before any history has accumulated. Callers
+    must handle None, not assume a value is always there.
+    """
+    ticker = ticker.upper()
+    engine = get_engine()
+    stmt = (
+        select(health_score_history.c.overall, health_score_history.c.computed_at)
+        .where(health_score_history.c.ticker == ticker)
+        .where(func.date(health_score_history.c.computed_at) < before_date)
+        .order_by(health_score_history.c.computed_at.desc())
+        .limit(1)
+    )
+    with engine.connect() as conn:
+        row = conn.execute(stmt).fetchone()
+    if row is None:
+        return None
+    return {"overall": row.overall, "computed_at": row.computed_at.isoformat()}
 
 
 def list_holdings() -> list[dict]:

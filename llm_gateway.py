@@ -51,8 +51,8 @@ the real gateway. If PORTKEY_API_KEY is unset, both functions below
 fall back to calling OpenAI directly (no gateway) rather than crashing,
 so local dev without a Portkey key still works.
 
-REAL FAILURE FOUND, LIVE, AGAINST A REAL ACCOUNT: a real run of
-test_q9.py/test_q11.py/test_q13.py returned
+REAL FAILURE FOUND, LIVE, AGAINST A REAL ACCOUNT (2026-07-28): a real run
+of test_q9.py/test_q11.py/test_q13.py returned
 `openai.BadRequestError: ... 'inline_provider_blocked' ...
 "Inline provider names are not allowed when block_inline_config is
 enabled. Use a saved integration via '@slug' instead." 'field':
@@ -61,7 +61,7 @@ enabled. Use a saved integration via '@slug' instead." 'field':
 referenced as "@<slug>" instead. The exact same code, called as a bare
 `build_chat_llm(...).invoke(...)` one-liner outside the LangGraph agent,
 succeeded moments later with no account-side change made in between --
-unexplained inconsistency, not yet root-caused (possibly tied to
+unexplained inconsistency, not root-caused at the time (possibly tied to
 whether the request carries bound tools, since the agent's call does
 and the bare one-liner doesn't; possibly Portkey-side flakiness around
 this setting). Rather than chase that further, PORTKEY_PROVIDER below
@@ -69,9 +69,16 @@ makes the provider value configurable via env var instead of hardcoded,
 so switching to a saved integration is a .env change, not a code change:
 create an OpenAI Integration in the Portkey dashboard (Integrations /
 Model Catalog), copy its slug, and set `PORTKEY_PROVIDER=@your-slug-here`
-in .env. Leave it unset and this still sends the bare "openai" string,
-which may or may not be accepted depending on whatever is causing the
-inconsistency above.
+in .env.
+
+FIXED AND CONFIRMED LIVE (2026-07-31): a real Integration was created in
+the Portkey dashboard and `PORTKEY_PROVIDER=@maiu-fukui` set in .env. Ran
+`python test_q9.py --ticker ALAB --company "Astera Labs"` against the
+real account, from inside the live LangGraph agent with bound tools --
+the exact shape of call that failed above, not the easier bare one-liner
+-- and it completed clean: no BadRequestError, no inline_provider_blocked,
+a real scored response came back (RAGAS AgentGoalAccuracyWithReference
+1.00). The fix holds for the real failure mode, not just the easy case.
 """
 
 from __future__ import annotations
