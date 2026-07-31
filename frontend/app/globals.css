@@ -96,6 +96,16 @@
   --status-monitor-fg: #a56400;
   --status-at-risk-bg: #fce4e4;
   --status-at-risk-fg: #b42318;
+
+  /* AI insight banner (dashboard.tsx's portfolio summary, 2026-07-29).
+     NOT derived from --primary via a Tailwind opacity modifier (e.g.
+     bg-primary/5) -- tried that first and it read as flat gray, not
+     navy: #16213e is dark enough that blending a few % of it into the
+     ivory background barely moves the hue, only the lightness, so the
+     result has no visible blue in it. Hand-tuned instead, same approach
+     as the status colors above rather than a computed blend. */
+  --insight-bg: #eef1f7;
+  --insight-border: #ccd6ea;
 }
 
 .dark {

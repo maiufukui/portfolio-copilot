@@ -28,6 +28,18 @@ export interface HealthSignal {
 export interface HealthScore {
   ticker: string;
   overall: HealthSignal["status"];
+  // Most recent status from before today, or null on day one before any
+  // history has accumulated (app/db.py's health_score_history, wired
+  // 2026-07-29 for the portfolio summary feature). Not currently
+  // rendered per-signal anywhere in the UI -- the portfolio summary
+  // endpoint does its own status-change comparison server-side using
+  // this same field.
+  overall_yesterday: HealthSignal["status"] | null;
+  // ISO timestamp of that snapshot -- may be more than one calendar day
+  // old, since the write only happens when the health score is freshly
+  // computed (2026-07-29, Maiu caught the "since yesterday" copy was
+  // wrong for exactly this reason). Not currently rendered in the UI.
+  overall_as_of: string | null;
   signals: {
     revenue_growth?: HealthSignal & {
       yoy_growth_by_quarter?: QuarterPoint[];
@@ -124,6 +136,16 @@ async function getJson<T>(path: string): Promise<T> {
     throw new ChatApiError(detail);
   }
   return res.json();
+}
+
+// null is a real, expected response (no holdings yet, no history yet on
+// day one, or the underlying LLM call failed) -- not an error. Callers
+// render their own honest fallback text rather than treating null as a
+// fetch failure. See server.py's /portfolio-summary and
+// app/tools.py's generate_portfolio_summary docstring.
+export async function fetchPortfolioSummary(): Promise<string | null> {
+  const data = await getJson<{ summary: string | null }>("/portfolio-summary");
+  return data.summary;
 }
 
 export async function fetchTickers(): Promise<string[]> {

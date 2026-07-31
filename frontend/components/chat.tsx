@@ -16,7 +16,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { toolLabel } from "@/lib/messages";
@@ -44,16 +43,35 @@ function toolIcon(name?: string) {
   return <Search className="size-3" />;
 }
 
+// Cap on how tall the input box is allowed to auto-grow before it starts
+// scrolling internally instead -- otherwise a long pasted message could
+// push the send button (and the message list above it) off-screen.
+const MAX_INPUT_HEIGHT_PX = 160;
+
 export function Chat({ ticker, threadId }: { ticker: string; threadId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isLoading]);
+
+  // Auto-grow the input as text wraps past one line, instead of a fixed
+  // single-line box that just clips/hides what's typed (2026-07-29, Maiu:
+  // "text gets cut off and i can't see what i'm typing"). Runs on every
+  // `input` change, which covers both typing AND the programmatic clear
+  // in send() below (setInput("") isn't itself a typing event, so this
+  // has to key off the value, not an onChange handler alone).
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT_PX)}px`;
+  }, [input]);
 
   const send = async (text: string) => {
     const question = text.trim();
@@ -152,15 +170,27 @@ export function Chat({ ticker, threadId }: { ticker: string; threadId: string })
       <div className="border-t bg-background">
         <form
           onSubmit={onSubmit}
-          className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-3"
+          className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 py-3"
         >
-          <Input
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends, Shift+Enter inserts a newline -- standard
+              // chat-input convention, and needed now that this is a real
+              // multi-line textarea instead of a single-line input where
+              // Enter had nothing else it could mean.
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send(input);
+              }
+            }}
             placeholder={`Ask about ${ticker}...`}
             disabled={isLoading}
-            className="h-10"
+            rows={1}
             autoFocus
+            className="max-h-40 min-h-10 w-full min-w-0 resize-none rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm leading-snug transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
           />
           <Button
             type="submit"

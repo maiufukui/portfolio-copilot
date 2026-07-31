@@ -2,14 +2,37 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthPill } from "@/components/health-pill";
 import { MiniLineChart } from "@/components/mini-line-chart";
 import { NewsList } from "@/components/news-list";
 import { TickerCard } from "@/components/ticker-card";
-import { fetchDashboard, fetchHoldings, type DashboardData, type HealthSignal, type HoldingRecord } from "@/lib/api";
+import {
+  fetchDashboard,
+  fetchHoldings,
+  fetchPortfolioSummary,
+  type DashboardData,
+  type HealthSignal,
+  type HoldingRecord,
+} from "@/lib/api";
+
+// Real local time, not a hard-coded "Good afternoon" (2026-07-29, Maiu
+// caught this -- the greeting never actually changed regardless of when
+// the page was opened). Computed directly in the render body (see the
+// <h1> below) rather than via a useEffect + setState -- that pattern
+// trips eslint's react-hooks/set-state-in-effect rule (setState with no
+// actual subscription/sync work happening is a real anti-pattern, not a
+// false positive here), and it isn't needed anyway: the <h1> below
+// carries suppressHydrationWarning, which is the standard React/Next.js
+// way to say "this text legitimately differs between the server's
+// render and the browser's local clock, that's expected, don't warn."
+function greetingForHour(hour: number): string {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 function formatMoney(n: number): string {
   return n.toLocaleString("en-US", {
@@ -21,6 +44,16 @@ function formatMoney(n: number): string {
 
 function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Shared by PortfolioValue and the "Your Holdings" header (2026-07-29) --
+// one formatting rule instead of two copies that could drift apart.
+function formatEtTime(d: Date): string {
+  return d.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 // "Mar '25" -- plain calendar month + year of the period's end date
@@ -91,9 +124,19 @@ function describeLeadership(
 function PortfolioValue({
   data,
   holdings,
+  lastFetchedAt,
 }: {
   data: Record<string, DashboardData>;
   holdings: HoldingRecord[];
+  // Real fetch time, not render time (2026-07-29, Maiu: fixed a bug found
+  // while diagnosing the MRVL/ALAB "wrong %" report -- this label existed
+  // before but was computed with `new Date()` at render time, so it
+  // silently showed "now" on every re-render regardless of how old the
+  // underlying data actually was. A tab left open for hours with a dead
+  // backend would show a perfectly current-looking "As of" time right
+  // next to hours-stale prices -- exactly the kind of silent staleness
+  // that caused the original confusion.
+  lastFetchedAt: Date | null;
 }) {
   let value = 0;
   let prevValue = 0;
@@ -111,11 +154,7 @@ function PortfolioValue({
   const pctChange = prevValue > 0 ? (dollarChange / prevValue) * 100 : 0;
   const changeUp = dollarChange >= 0;
 
-  const asOf = new Date().toLocaleTimeString("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const asOf = lastFetchedAt ? formatEtTime(lastFetchedAt) : null;
 
   return (
     <div className="w-full sm:w-72">
@@ -136,9 +175,9 @@ function PortfolioValue({
           >
             {changeUp ? "+" : "-"}
             {formatMoney(Math.abs(dollarChange))} ({changeUp ? "+" : "-"}
-            {Math.abs(pctChange).toFixed(2)}%) today
+            {Math.abs(pctChange).toFixed(2)}%) vs. previous close
           </p>
-          <p className="text-xs text-muted-foreground">As of {asOf} ET</p>
+          {asOf && <p className="text-xs text-muted-foreground">Prices as of {asOf} ET</p>}
         </>
       ) : (
         <p className="text-sm text-muted-foreground">Loading...</p>
@@ -219,6 +258,15 @@ export function Dashboard({
   const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Real fetch time, set only when at least one ticker actually loaded --
+  // see PortfolioValue's comment on why this replaced a render-time clock.
+  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
+  // AI-generated "vs. yesterday" summary (2026-07-29) -- null is a real,
+  // expected state (no holdings, no history yet, or the LLM call
+  // failed), not a loading placeholder. The header renders its own
+  // honest fallback text when this is null; see fetchPortfolioSummary's
+  // comment in lib/api.ts.
+  const [summary, setSummary] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,6 +304,18 @@ export function Dashboard({
               // without a Portfolio Value figure if /holdings is down.
               if (!cancelled) setHoldings([]);
             }),
+          // Non-fatal, same reasoning as fetchHoldings above -- a slow or
+          // failed summary must never block or break the rest of the
+          // dashboard. fetchPortfolioSummary itself already resolves to
+          // null (not a rejection) for the expected "not enough data yet"
+          // cases; this .catch only covers a genuine network/HTTP failure.
+          fetchPortfolioSummary()
+            .then((s) => {
+              if (!cancelled) setSummary(s);
+            })
+            .catch(() => {
+              if (!cancelled) setSummary(null);
+            }),
         ]);
         if (cancelled) return;
         const byTicker: Record<string, DashboardData> = {};
@@ -275,6 +335,7 @@ export function Dashboard({
           console.error(`Dashboard: failed to load data for ${failedTickers.join(", ")}`);
         }
         setData(byTicker);
+        if (Object.keys(byTicker).length > 0) setLastFetchedAt(new Date());
         // Only fall back to the full-page error when EVERY ticker failed
         // (a real "backend is down" case) -- not when some tickers loaded
         // fine and one didn't, which is now a partial-data case handled by
@@ -326,23 +387,61 @@ export function Dashboard({
 
   return (
     <div className="flex w-full flex-col gap-6 px-6 py-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">Good afternoon, Maiu</h1>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            North analyzed your portfolio and found {flaggedCount}{" "}
-            {flaggedCount === 1 ? "change" : "changes"} that may need your attention.
-          </p>
+      {/* Grid header, banner nested INSIDE column 1 with the greeting
+          (2026-07-29, Maiu, corrected after 3 wrong attempts at this as
+          a separate full-width row below everything): same row as
+          Portfolio Value, not below the whole header -- confined to the
+          greeting's own column, so it structurally cannot reach into
+          Portfolio Value's column no matter what. Stacked tight under
+          the h1 (gap-2) so it reads as one block with the greeting,
+          which is what makes the two columns end up visually balanced
+          in height instead of the banner floating in dead space below a
+          much taller Portfolio Value block. */}
+      <div className="grid grid-cols-[1fr_auto_auto] items-start gap-x-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-heading text-2xl font-semibold" suppressHydrationWarning>
+            {greetingForHour(new Date().getHours())}, Maiu
+          </h1>
+          {/* Colors are hand-tuned --insight-bg/--insight-border
+              (globals.css), not a Tailwind opacity modifier on --primary
+              -- that read as flat gray, since North Navy is too dark for
+              a low-opacity blend to keep any visible blue in it. Sparkle
+              icon only appears for a real AI-generated summary -- the
+              fallback sentence below is honest, deterministic copy, not
+              AI output, so it doesn't get the same "AI insight" visual
+              claim. */}
+          <div className="flex w-[92%] items-start gap-2.5 rounded-xl border border-[var(--insight-border)] bg-[var(--insight-bg)] px-4 py-3">
+            {summary && <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />}
+            <p className="text-sm text-foreground/90">
+              {summary ??
+                // Honest fallback, not the old "North analyzed... and
+                // found N changes" copy (2026-07-29, Maiu: that line
+                // implied an AI-generated comparison to yesterday that
+                // didn't actually exist -- see chat history). This is a
+                // plain, real, present-tense count, shown when there
+                // isn't yet enough data for the real summary (no
+                // holdings, first day with no health-score history, or
+                // the LLM call failed).
+                `${flaggedCount} of ${tickers.length} tracked tickers ${
+                  flaggedCount === 1 ? "is" : "are"
+                } currently flagged for review.`}
+            </p>
+          </div>
         </div>
-        <div className="flex items-start gap-3">
-          <PortfolioValue data={data} holdings={holdings} />
-          {chatToggle}
-        </div>
+        <PortfolioValue data={data} holdings={holdings} lastFetchedAt={lastFetchedAt} />
+        {chatToggle}
       </div>
 
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-muted-foreground">Your Holdings</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Your Holdings
+            {lastFetchedAt && (
+              <span className="ml-2 font-normal text-muted-foreground/70">
+                · prices as of {formatEtTime(lastFetchedAt)} ET
+              </span>
+            )}
+          </h2>
           <Link href="/portfolio" className="text-sm text-primary hover:underline">
             View all holdings →
           </Link>
