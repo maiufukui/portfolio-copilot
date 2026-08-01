@@ -102,10 +102,14 @@
      bg-primary/5) -- tried that first and it read as flat gray, not
      navy: #16213e is dark enough that blending a few % of it into the
      ivory background barely moves the hue, only the lightness, so the
-     result has no visible blue in it. Hand-tuned instead, same approach
-     as the status colors above rather than a computed blend. */
-  --insight-bg: #eef1f7;
-  --insight-border: #ccd6ea;
+     result has no visible blue in it. A hand-tuned light-blue tint was
+     tried next and still read as gray in practice -- switched (Maiu,
+     2026-07-31) to reuse the exact same color as the sidebar's active
+     nav-item highlight (--sidebar-accent/--muted, #f2f0ea) instead of a
+     bespoke color, so the banner reads as part of the same brand
+     palette already established elsewhere rather than a new one-off. */
+  --insight-bg: #f2f0ea;
+  --insight-border: #e9e7e2;
 }
 
 .dark {
